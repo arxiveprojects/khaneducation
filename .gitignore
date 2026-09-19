@@ -1,6 +1,7 @@
 # Project-specific
 data/
 seed.json
+uploads/
 
 # Infrastructure & IaC
 .terraform/
@@ -27,7 +28,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -172,16 +173,17 @@ cython_debug/
 ################################
 
 # Dependencies
+node_modules/
 /node_modules
 /.pnp
 .pnp.js
 
 # Testing
 /coverage
-
-# Production
-/build
-/dist
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
 
 # Misc
 .DS_Store

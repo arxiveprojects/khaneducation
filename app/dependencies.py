@@ -1,109 +1,88 @@
-from fastapi import Depends, HTTPException, status
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+from fastapi import Depends, HTTPException, Path, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from datetime import datetime, timedelta, timezone
+from sqlalchemy.orm import Session
 
-from .models import User, UserRoleEnum
 from .config import settings
-from .schemas import User as UserSchema, TokenData, Student as StudentSchema
-from . import crud
+from .database import get_db
+from .models import MembershipRole, MembershipStatus, SchoolMembership, User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-SECRET_KEY = settings.secret_key
-ALGORITHM = settings.algorithm
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
-
-
-def verify_access_token(token: str, credentials_exception):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        id: str = payload.get("user_id")
-        if id is None:
-            raise credentials_exception
-        token_data = TokenData(id=id)
-    except JWTError:
-        raise credentials_exception
-
-    return token_data
+STAFF_ROLES = {MembershipRole.OWNER, MembershipRole.ADMIN}
+TEACHER_PLUS = STAFF_ROLES | {MembershipRole.TEACHER}
 
 
-def create_access_token(data: dict, expires_delta: timedelta = None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(days=30)
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserSchema:
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("email")
-        user_id: int = payload.get("user_id")
-        username: str = payload.get("username")
-
-        if email is None or user_id is None or username is None:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        user_id = payload.get("user_id")
+        if not user_id:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
-    # Get user from PynamoDB
-    try:
-        user = User.get(hash_key=user_id)
-    except User.DoesNotExist:
+    user = db.get(User, user_id)
+    if not user or not user.is_active:
         raise credentials_exception
+    return user
 
-    return UserSchema(
-        id=user.id,
-        username=user.username,
-        first_name=getattr(user, "first_name", ""),
-        last_name=getattr(user, "last_name", ""),
-        email=user.email,
-        role=user.role,
+
+def _membership(db: Session, school_id: str, user_id: str) -> SchoolMembership:
+    membership = (
+        db.query(SchoolMembership)
+        .filter(
+            SchoolMembership.school_id == school_id,
+            SchoolMembership.user_id == user_id,
+            SchoolMembership.status == MembershipStatus.ACTIVE,
+        )
+        .first()
     )
+    if not membership:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="School membership required")
+    return membership
 
 
-async def get_current_student(user: UserSchema = Depends(get_current_user)) -> StudentSchema:
-    if str(user.role) != str(UserRoleEnum.STUDENT):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Student profile required",
-        )
-
-    # Verify student profile exists in PynamoDB
-    student = crud.crud_student.get_by_user_id(user.id)
-
-    if not student:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Complete your student profile first",
-        )
-
-    return student
+def require_school_member(
+    school_id: str = Path(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SchoolMembership:
+    return _membership(db, school_id, user.id)
 
 
-async def get_current_admin(current_user: UserSchema = Depends(get_current_user)) -> UserSchema:
-    if str(current_user.role) not in [str(UserRoleEnum.ADMIN), str(UserRoleEnum.STAFF)]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required",
-        )
-    return current_user
+def require_school_staff(
+    school_id: str = Path(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SchoolMembership:
+    membership = _membership(db, school_id, user.id)
+    if membership.role not in STAFF_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="School admin privileges required")
+    return membership
 
 
-async def get_content_admin(current_user: UserSchema = Depends(get_current_user)) -> UserSchema:
-    if str(current_user.role) not in [str(UserRoleEnum.ADMIN), str(UserRoleEnum.CONTENT_MANAGER)]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Content management privileges required",
-        )
-    return current_user
+def require_teacher_or_staff(
+    school_id: str = Path(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SchoolMembership:
+    membership = _membership(db, school_id, user.id)
+    if membership.role not in TEACHER_PLUS:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Teacher or admin privileges required")
+    return membership

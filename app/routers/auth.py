@@ -1,45 +1,28 @@
-# app/routers/auth.py
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-import logging
-from .. import schemas
-from ..models import User
-from .. import utils, dependencies
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from .. import schemas, services
+from ..database import get_db
+from ..dependencies import create_access_token
 
 router = APIRouter(tags=["Authentication"])
 
 
+@router.post("/auth/register", response_model=schemas.UserOut, status_code=201)
+def register(payload: schemas.UserCreate, db: Session = Depends(get_db)):
+    return services.register_user(db, payload)
+
+
+@router.post("/auth/login", response_model=schemas.Token)
 @router.post("/login", response_model=schemas.Token)
-def login(
-    user_credentials: schemas.UserLogin,
-):
-    try:
-        matching_user = next(User.email_index.query(user_credentials.email))
-        user = User.get(matching_user.id)
-    except StopIteration:
-        user = None
-    except Exception as e:
-        logger.error(f"Database error during user lookup for email {user_credentials.email}: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error")
-
-    if not user:
-        print("No user found with the provided email.")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid Credentials")
-
-    if not utils.verify(user_credentials.password, user.password):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid Credentials")
-
-    # --- Create access token ---
-    access_token = dependencies.create_access_token(
-        data={
-            "user_id": user.id,  # Assuming user.id is the hash key
+def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
+    user = services.authenticate_user(db, payload.email, payload.password)
+    token = create_access_token(
+        {
+            "user_id": user.id,
             "email": user.email,
             "username": user.username,
-            "role": user.role,  # This is the string value
+            "account_type": user.account_type.value,
         }
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": token, "token_type": "bearer"}

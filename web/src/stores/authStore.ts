@@ -1,18 +1,15 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { StudentProfile } from '@/types/api';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { MeProfile } from "@/types/api";
 
 interface AuthState {
-  // Auth state
-  profile: StudentProfile | null;
+  profile: MeProfile | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  
-  // Actions
-  setAuth: (profile: StudentProfile, token: string) => void;
-  setProfile: (profile: StudentProfile) => void;
-  updateProfile: (updates: Partial<StudentProfile>) => void;
+  setAuth: (profile: MeProfile, token: string) => void;
+  setProfile: (profile: MeProfile) => void;
+  updateProfile: (updates: Partial<MeProfile>) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
 }
@@ -22,52 +19,39 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       profile: null,
       token: null,
-      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
 
       setAuth: (profile, token) => {
-        set({
-          profile,
-          token,
-          isAuthenticated: true,
-          isLoading: false
-        });
+        localStorage.setItem("accessToken", token);
+        set({ profile, token, isAuthenticated: true, isLoading: false });
       },
-
-      setProfile: (profile) => {
-        set({ profile });
-      },
-
+      setProfile: (profile) => set({ profile }),
       updateProfile: (updates) => {
-        const currentProfile = get().profile;
-        if (currentProfile) {
-          set({
-            profile: { ...currentProfile, ...updates }
-          });
+        const current = get().profile;
+        if (current) {
+          set({ profile: { ...current, ...updates } });
         }
       },
-
       clearAuth: () => {
-        set({
-          profile: null,
-          token: null,
-          isAuthenticated: false,
-          isLoading: false
-        });
+        localStorage.removeItem("accessToken");
+        set({ profile: null, token: null, isAuthenticated: false, isLoading: false });
       },
-
-      setLoading: (loading) => {
-        set({ isLoading: loading });
-      }
+      setLoading: (loading) => set({ isLoading: loading }),
     }),
     {
-      name: 'auth-storage',
+      name: "auth-storage",
       partialize: (state) => ({
         profile: state.profile,
         token: state.token,
-        isAuthenticated: state.isAuthenticated
-      })
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
   )
 );
+
+export function isSchoolStaff(profile: MeProfile | null): boolean {
+  return Boolean(
+    profile?.memberships?.some((item) => ["owner", "admin", "teacher"].includes(item.role))
+  );
+}

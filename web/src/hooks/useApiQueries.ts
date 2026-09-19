@@ -8,56 +8,65 @@ import {
   getCurrentUser,
   getSubjects,
   getSubject,
-  createStudentProfile,
-  getStudentProfile,
   updateUserProfile,
   updateStudentProfile,
-  getLesson,
+  updateTeacherProfile,
+  getChapter,
   getQuiz,
   submitQuiz,
-  getPracticeTasks,
   getStudentDashboard,
   getLanguages,
   getAiAssistance,
-  getAdminDashboard,
-  adminAPI,
   getSubjectDetail,
   getQuizAttempts,
+  getSchools,
+  createSchool,
+  applyToSchool,
+  getMyInvitations,
+  respondInvitation,
+  getSchoolDashboard,
+  listSchoolSubjects,
+  createSubject,
+  inviteTeacher,
+  listApplications,
+  reviewApplication,
+  uploadBook,
+  listInvitations,
+  listSubjectBooks,
+  getBookJobs,
+  listSchoolEnrollments,
+  listSchoolAttendance,
+  recordAttendance,
+  listSchoolJobs,
+  listSchoolActivity,
+  getSchoolPerformance,
 } from "@/services/api";
-import {
-  User,
-  QuizSubmission,
-  AIAssistRequest,
-  Subject,
-  Lesson,
-} from "@/types/api";
+import { User, QuizSubmission, AIAssistRequest, AccountType, AttendanceStatus } from "@/types/api";
 
-// Auth hooks
 export const useLogin = () => {
   const { setAuth, setLoading } = useAuthStore();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      loginUser(email, password),
-    onMutate: () => {
-      setLoading(true);
-    },
-    onSuccess: async (data, variables) => {
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const data = await loginUser(email, password);
       const profile = await getCurrentUser();
-
+      return { data, profile };
+    },
+    onMutate: () => setLoading(true),
+    onSuccess: ({ data, profile }) => {
       setAuth(profile, data.access_token);
-
-      toast({
-        title: "Welcome back!",
-        description: "Successfully logged in.",
-      });
+      toast({ title: "Welcome back!", description: "Successfully logged in." });
     },
     onError: (error: AxiosError) => {
       setLoading(false);
+      const detail = (error.response?.data as { detail?: string })?.detail;
       toast({
         title: "Login Failed",
-        description: (error.response?.data as { detail: string })?.detail || "Invalid credentials. Please try again.",
+        description:
+          error.response?.status === 404
+            ? "Could not reach the local API. Confirm it is running on http://127.0.0.1:8000 and use student@example.com / Abc123()."
+            : detail || "Invalid credentials. Use student@example.com and password Abc123().",
         variant: "destructive",
       });
     },
@@ -69,54 +78,19 @@ export const useRegister = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (userData: Partial<User>) => registerUser(userData),
-    onMutate: () => {
-      setLoading(true);
-    },
+    mutationFn: (userData: Partial<User> & { account_type?: AccountType }) => registerUser(userData),
+    onMutate: () => setLoading(true),
     onSuccess: async (user, variables) => {
-      // variables contains the userData passed to mutationFn, including password if provided
-      const response = await loginUser(user.email, variables.password);
+      const response = await loginUser(user.email, variables.password || "");
       const profile = await getCurrentUser();
       setAuth(profile, response.access_token);
-      toast({
-        title: "Account Created!",
-        description: "Welcome to our educational platform.",
-      });
+      toast({ title: "Account Created!", description: "Welcome to Khan Education." });
     },
     onError: (error: AxiosError) => {
       setLoading(false);
       toast({
         title: "Registration Failed",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "Unable to create account. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-};
-
-// Profile hooks
-export const useCreateProfile = () => {
-  const { setProfile } = useAuthStore();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: (profileData: { language: string; current_grade: string }) =>
-      createStudentProfile(profileData),
-    onSuccess: (profile) => {
-      setProfile(profile);
-      toast({
-        title: "Profile Created!",
-        description: "Your learning profile has been set up.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Profile Creation Failed",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "Unable to create profile. Please try again.",
+        description: (error.response?.data as { detail: string })?.detail || "Unable to create account.",
         variant: "destructive",
       });
     },
@@ -125,10 +99,9 @@ export const useCreateProfile = () => {
 
 export const useStudentProfile = () => {
   const { isAuthenticated } = useAuthStore();
-
   return useQuery({
-    queryKey: ["student-profile"],
-    queryFn: getStudentProfile,
+    queryKey: ["me"],
+    queryFn: getCurrentUser,
     enabled: isAuthenticated,
   });
 };
@@ -136,555 +109,297 @@ export const useStudentProfile = () => {
 export const useUpdateUserProfile = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
   return useMutation({
-    mutationFn: (profileData: {
-      first_name: string;
-      last_name: string;
-      email: string;
-    }) => updateUserProfile(profileData),
+    mutationFn: (profileData: { first_name: string; last_name: string; email: string }) => updateUserProfile(profileData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["student-profile"] });
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been updated successfully.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Profile Update Failed",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "Unable to update profile. Please try again.",
-        variant: "destructive",
-      });
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      toast({ title: "Profile Updated" });
     },
   });
 };
 
 export const useUpdateStudentProfile = () => {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-
   return useMutation({
-    mutationFn: (profileData: { language: string }) =>
-      updateStudentProfile(profileData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["student-profile"] });
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been updated successfully.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Profile Update Failed",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "Unable to update profile. Please try again.",
-        variant: "destructive",
-      });
-    },
+    mutationFn: (profileData: { language?: string; current_grade?: number }) => updateStudentProfile(profileData),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
   });
 };
 
-// Subject hooks
-export const useSubjects = (params?: {
-  grade_level?: number;
-  language?: string;
-  search?: string;
-}) => {
-  return useQuery({
-    queryKey: ["subjects", params],
-    queryFn: () => getSubjects(params),
-    staleTime: 10 * 60 * 1000, // 10 minutes
+export const useUpdateTeacherProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateTeacherProfile,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
   });
 };
 
-export const useSubject = (id: string) => {
-  return useQuery({
+export const useSubjects = () =>
+  useQuery({
+    queryKey: ["subjects"],
+    queryFn: getSubjects,
+  });
+
+export const useSubject = (id?: string) =>
+  useQuery({
     queryKey: ["subject", id],
-    queryFn: () => getSubject(id),
+    queryFn: () => getSubject(id as string),
     enabled: !!id,
   });
-};
 
-export const useSubjectDetail = (id: string) => {
-  return useQuery({
+export const useSubjectDetail = (id?: string) =>
+  useQuery({
     queryKey: ["subject-detail", id],
-    queryFn: () => getSubjectDetail(id),
+    queryFn: () => getSubjectDetail(id as string),
     enabled: !!id,
   });
-};
-export const useLesson = (lessonId: string) => {
-  return useQuery({
-    queryKey: ["lesson", lessonId],
-    queryFn: () => getLesson(lessonId),
-    enabled: !!lessonId,
-  });
-};
 
-// Quiz hooks
-export const useQuiz = (lessonId: string, options?: { enabled: boolean }) => {
-  return useQuery({
-    queryKey: ["quiz", lessonId],
-    queryFn: () => getQuiz(lessonId),
-    enabled: !!lessonId,
-    gcTime: 0, // Disable cache
+export const useLesson = (chapterId?: string) =>
+  useQuery({
+    queryKey: ["chapter", chapterId],
+    queryFn: () => getChapter(chapterId as string),
+    enabled: !!chapterId,
+  });
+
+export const useQuiz = (chapterId: string, options?: { enabled: boolean }) =>
+  useQuery({
+    queryKey: ["quiz", chapterId],
+    queryFn: () => getQuiz(chapterId),
+    enabled: !!chapterId,
+    gcTime: 0,
     ...options,
   });
-};
 
-export const useQuizAttempts = (lessonId: string) => {
-  return useQuery({
-    queryKey: ["quiz-attempts", lessonId],
-    queryFn: () => getQuizAttempts(lessonId),
-    enabled: !!lessonId,
+export const useQuizAttempts = (chapterId: string) =>
+  useQuery({
+    queryKey: ["quiz-attempts", chapterId],
+    queryFn: () => getQuizAttempts(chapterId),
+    enabled: !!chapterId,
   });
-};
-
 
 export const useSubmitQuiz = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
   return useMutation({
     mutationFn: (submission: QuizSubmission) => submitQuiz(submission),
     onSuccess: (data) => {
-      // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ["student-dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["enrollments"] });
-
-      const passed = data.attempt.passed;
       toast({
-        title: passed ? "Quiz Passed!" : "Quiz Completed",
-        description: `Score: ${Math.round(data.attempt.score)}%. ${
-          data.ai_feedback
-        }`,
-        variant: passed ? "default" : "destructive",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Quiz Submission Failed",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "Unable to submit quiz. Please try again.",
-        variant: "destructive",
+        title: data.attempt.passed ? "Quiz Passed!" : "Quiz Completed",
+        description: `Score: ${Math.round(data.attempt.score)}%. ${data.ai_feedback}`,
+        variant: data.attempt.passed ? "default" : "destructive",
       });
     },
   });
 };
 
-// Practice tasks
-export const usePracticeTasks = (lessonId: string) => {
-  return useQuery({
-    queryKey: ["practice-tasks", lessonId],
-    queryFn: () => getPracticeTasks(lessonId),
-    enabled: !!lessonId,
-  });
-};
-
-// Dashboard hooks
 export const useStudentDashboard = () => {
   const { isAuthenticated } = useAuthStore();
-
   return useQuery({
     queryKey: ["student-dashboard"],
     queryFn: getStudentDashboard,
     enabled: isAuthenticated,
-    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 };
 
-// Languages hooks
-export const useLanguages = () => {
-  return useQuery({
-    queryKey: ["get-languages"],
+export const useLanguages = () =>
+  useQuery({
+    queryKey: ["languages"],
     queryFn: getLanguages,
-    staleTime: 2 * 60 * 1000, // 2 minutes
   });
-};
 
-// AI Assistant hooks
-export const useAiAssistance = () => {
-  const { toast } = useToast();
-
-  return useMutation({
+export const useAiAssistance = () =>
+  useMutation({
     mutationFn: (request: AIAssistRequest) => getAiAssistance(request),
-    onError: (error: AxiosError) => {
-      toast({
-        title: "AI Assistant Error",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "Unable to get AI assistance. Please try again.",
-        variant: "destructive",
-      });
-    },
   });
-};
 
+export const useSchools = () => useQuery({ queryKey: ["schools"], queryFn: getSchools });
 
-// Admin hooks with comprehensive error handling
-export const useAdminUsers = (params?: { skip?: number; limit?: number }) => {
-  const { profile } = useAuthStore();
-  const isAdmin = profile?.user?.role === "admin";
-
-  return useQuery({
-    queryKey: ["admin-users", params],
-    queryFn: () => adminAPI.getUsers(params),
-    enabled: isAdmin,
-    retry: 3,
-    staleTime: 5 * 60 * 1000,
-  });
-};
-
-export const useCreateUser = () => {
+export const useCreateSchool = () => {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-
   return useMutation({
-    mutationFn: (userData: Partial<User>) => adminAPI.createUser(userData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({
-        title: "User Created",
-        description: "New user has been created successfully.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Create User",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
-    },
+    mutationFn: createSchool,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
   });
 };
 
-export const useUpdateUser = () => {
+export const useApplyToSchool = () => {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-
   return useMutation({
-    mutationFn: ({
-      userId,
-      userData,
-    }: {
-      userId: string;
-      userData: Partial<User>;
-    }) => adminAPI.updateUser(userId, userData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({
-        title: "User Updated",
-        description: "User information has been updated successfully.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Update User",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
-    },
+    mutationFn: ({ schoolId, grade_level }: { schoolId: string; grade_level: number }) => applyToSchool(schoolId, grade_level),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["student-dashboard"] }),
   });
 };
 
-export const useDeleteUser = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+export const useTeacherInvitations = () =>
+  useQuery({
+    queryKey: ["teacher-invitations"],
+    queryFn: getMyInvitations,
+  });
 
+export const useRespondInvitation = () => {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (userId: string) => adminAPI.deleteUser(userId),
+    mutationFn: ({ invitationId, accept }: { invitationId: string; accept: boolean }) => respondInvitation(invitationId, accept),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({
-        title: "User Deleted",
-        description: "User has been deleted successfully.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Delete User",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
+      queryClient.invalidateQueries({ queryKey: ["teacher-invitations"] });
+      queryClient.invalidateQueries({ queryKey: ["me"] });
     },
   });
 };
 
-export const useAdminSubjects = (params?: {
-  skip?: number;
-  limit?: number;
-}) => {
-  const { profile } = useAuthStore();
-  const isAdmin = profile?.user?.role === "admin";
-
-  return useQuery({
-    queryKey: ["admin-subjects", params],
-    queryFn: () => adminAPI.getAdminSubjects(params),
-    enabled: isAdmin,
-    retry: 3,
-    staleTime: 5 * 60 * 1000,
+export const useSchoolDashboard = (schoolId?: string) =>
+  useQuery({
+    queryKey: ["school-dashboard", schoolId],
+    queryFn: () => getSchoolDashboard(schoolId as string),
+    enabled: !!schoolId,
   });
-};
 
-export const useCreateAdminSubject = () => {
+export const useSchoolSubjects = (schoolId?: string) =>
+  useQuery({
+    queryKey: ["school-subjects", schoolId],
+    queryFn: () => listSchoolSubjects(schoolId as string),
+    enabled: !!schoolId,
+  });
+
+export const useCreateSubject = (schoolId: string) => {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-
   return useMutation({
-    mutationFn: (
-      subjectData: Omit<
-        Subject,
-        "id" | "total_lessons" | "completed_lessons" | "progress"
-      >
-    ) => adminAPI.createAdminSubject(subjectData),
+    mutationFn: (data: { name: string; description?: string; grade_level: number }) =>
+      createSubject(schoolId, { name: data.name, description: data.description || "", grade_level: data.grade_level }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["school-subjects", schoolId] }),
+  });
+};
+
+export const useInviteTeacher = (schoolId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (email: string) => inviteTeacher(schoolId, email),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["school-invitations", schoolId] }),
+  });
+};
+
+export const useSchoolInvitations = (schoolId?: string) =>
+  useQuery({
+    queryKey: ["school-invitations", schoolId],
+    queryFn: () => listInvitations(schoolId as string),
+    enabled: !!schoolId,
+  });
+
+export const useSchoolApplications = (schoolId?: string) =>
+  useQuery({
+    queryKey: ["school-applications", schoolId],
+    queryFn: () => listApplications(schoolId as string),
+    enabled: !!schoolId,
+  });
+
+export const useReviewApplication = (schoolId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, status, subjectIds }: { applicationId: string; status: "accepted" | "rejected"; subjectIds?: string[] }) =>
+      reviewApplication(schoolId, applicationId, status, subjectIds),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["school-applications", schoolId] }),
+  });
+};
+
+export const useUploadBook = (subjectId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ title, language, file }: { title: string; language: string; file: File }) =>
+      uploadBook(subjectId, title, language, file),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-subjects"] });
-      toast({
-        title: "Subject Created",
-        description: "New subject has been created successfully.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Create Subject",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
+      queryClient.invalidateQueries({ queryKey: ["subject-detail", subjectId] });
+      queryClient.invalidateQueries({ queryKey: ["school-subjects"] });
+      queryClient.invalidateQueries({ queryKey: ["subject-books", subjectId] });
+      queryClient.invalidateQueries({ queryKey: ["school-jobs"] });
     },
   });
 };
 
-export const useUpdateAdminSubject = () => {
+export const useSubjectBooks = (subjectId?: string) =>
+  useQuery({
+    queryKey: ["subject-books", subjectId],
+    queryFn: () => listSubjectBooks(subjectId as string),
+    enabled: !!subjectId,
+  });
+
+export const useBookJobs = (bookId?: string) =>
+  useQuery({
+    queryKey: ["book-jobs", bookId],
+    queryFn: () => getBookJobs(bookId as string),
+    enabled: !!bookId,
+    refetchInterval: (query) => {
+      const jobs = query.state.data || [];
+      return jobs.some((job) => job.status === "queued" || job.status === "running") ? 4000 : false;
+    },
+  });
+
+export const useSchoolJobs = (schoolId?: string) =>
+  useQuery({
+    queryKey: ["school-jobs", schoolId],
+    queryFn: () => listSchoolJobs(schoolId as string),
+    enabled: !!schoolId,
+    refetchInterval: (query) => {
+      const jobs = query.state.data || [];
+      return jobs.some((job) => job.status === "queued" || job.status === "running") ? 4000 : false;
+    },
+  });
+
+export const useSchoolEnrollments = (schoolId?: string) =>
+  useQuery({
+    queryKey: ["school-enrollments", schoolId],
+    queryFn: () => listSchoolEnrollments(schoolId as string),
+    enabled: !!schoolId,
+  });
+
+export const useSchoolAttendance = (schoolId?: string) =>
+  useQuery({
+    queryKey: ["school-attendance", schoolId],
+    queryFn: () => listSchoolAttendance(schoolId as string),
+    enabled: !!schoolId,
+  });
+
+export const useRecordAttendance = (schoolId: string) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
   return useMutation({
     mutationFn: ({
-      subjectId,
-      subjectData,
+      enrollmentId,
+      status,
+      on_date,
+      note,
     }: {
-      subjectId: string;
-      subjectData: Partial<Subject>;
-    }) => adminAPI.updateAdminSubject(subjectId, subjectData),
+      enrollmentId: string;
+      status: AttendanceStatus;
+      on_date: string;
+      note?: string;
+    }) => recordAttendance(schoolId, enrollmentId, { on_date, status, note }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-subjects"] });
-      toast({
-        title: "Subject Updated",
-        description: "Subject has been updated successfully.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Update Subject",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
+      queryClient.invalidateQueries({ queryKey: ["school-attendance", schoolId] });
+      queryClient.invalidateQueries({ queryKey: ["school-activity", schoolId] });
+      queryClient.invalidateQueries({ queryKey: ["school-dashboard", schoolId] });
+      toast({ title: "Attendance saved" });
     },
   });
 };
 
-export const useDeleteAdminSubject = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: (subjectId: string) => adminAPI.deleteAdminSubject(subjectId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-subjects"] });
-      toast({
-        title: "Subject Deleted",
-        description: "Subject has been deleted successfully.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Delete Subject",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
-    },
+export const useSchoolActivity = (schoolId?: string) =>
+  useQuery({
+    queryKey: ["school-activity", schoolId],
+    queryFn: () => listSchoolActivity(schoolId as string),
+    enabled: !!schoolId,
   });
-};
 
-export const useAdminDashboard = () => {
-  const { profile } = useAuthStore();
-  const isAdmin = profile?.user?.role === "admin";
-
-  return useQuery({
-    queryKey: ["admin-dashboard"],
-    queryFn: getAdminDashboard,
-    enabled: isAdmin,
-    staleTime: 2 * 60 * 1000,
-    retry: 3,
+export const useSchoolPerformance = (schoolId?: string) =>
+  useQuery({
+    queryKey: ["school-performance", schoolId],
+    queryFn: () => getSchoolPerformance(schoolId as string),
+    enabled: !!schoolId,
   });
-};
 
-export const useAdminLessons = (
-  subjectId: string,
-  params?: { skip?: number; limit?: number }
-) => {
-  const { profile } = useAuthStore();
-  const isAdmin = profile?.user?.role === "admin";
-
-  return useQuery({
-    queryKey: ["admin-lessons", subjectId, params],
-    queryFn: () => adminAPI.getAdminLessons(subjectId as string, params),
-    enabled: isAdmin && !!subjectId,
-    retry: 3,
-    staleTime: 5 * 60 * 1000,
+export const usePracticeTasks = (_lessonId?: string) =>
+  useQuery({
+    queryKey: ["practice-tasks", _lessonId],
+    queryFn: async () => [],
+    enabled: false,
   });
-};
-
-export const useCreateAdminLesson = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: ({
-      subjectId,
-      lessonData,
-    }: {
-      subjectId: string;
-      lessonData: { title: string; language: "Arabic" | "English" | "Pashto" | "Persian" | "Urdu" };
-    }) => adminAPI.createAdminLesson(subjectId, lessonData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-lessons"] });
-      toast({
-        title: "Lesson Creation Initiated",
-        description: "New lesson is being created in the background.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Create Lesson",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
-    },
-  });
-};
-
-export const useRegenerateAdminLessonContent = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: (lessonId: string) =>
-      adminAPI.regenerateAdminLessonContent(lessonId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-lessons"] });
-      toast({
-        title: "Content Regeneration Started",
-        description: "Lesson content is being regenerated in the background.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Regenerate Content",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
-    },
-  });
-};
-
-export const useUpdateAdminLesson = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: ({
-      lessonId,
-      lessonData,
-    }: {
-      lessonId: string;
-      lessonData: Partial<Lesson>;
-    }) => adminAPI.updateAdminLesson(lessonId, lessonData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-lessons"] });
-      toast({
-        title: "Lesson Updated",
-        description: "Lesson information has been updated successfully.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Update Lesson",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
-    },
-  });
-};
-
-export const useDeleteAdminLesson = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: (lessonId: string) => adminAPI.deleteAdminLesson(lessonId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-lessons"] });
-      toast({
-        title: "Lesson Deleted",
-        description: "Lesson has been deleted successfully.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Delete Lesson",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
-    },
-  });
-};
-
-export const useVerifyAdminLesson = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: (lessonId: string) => adminAPI.verifyAdminLesson(lessonId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-lessons"] });
-      toast({
-        title: "Lesson Verified",
-        description: "Lesson has been marked as verified.",
-      });
-    },
-    onError: (error: AxiosError) => {
-      toast({
-        title: "Failed to Verify Lesson",
-        description:
-          (error.response?.data as { detail: string })?.detail ||
-          "An error occurred",
-        variant: "destructive",
-      });
-    },
-  });
-};

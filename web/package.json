@@ -13,7 +13,8 @@
     "terraform": "cd ../terraform && terraform apply -auto-approve",
     "upload-to-s3": "BUCKET=$(cd ../terraform && terraform output -raw s3_bucket_name) && aws s3 sync dist/ s3://$BUCKET --delete",
     "set-to-cloudfront": "CLOUDFRONT_ID=$(cd ../terraform && terraform output -raw cloudfront_distribution_id) && aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths '/*'",
-    "deploy": "npm run build && npm run upload-to-s3 && npm run set-to-cloudfront"
+    "deploy": "npm run build && npm run upload-to-s3 && npm run set-to-cloudfront",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
@@ -73,6 +74,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/typography": "^0.5.15",
     "@types/node": "^22.5.5",
     "@types/react": "^18.3.3",

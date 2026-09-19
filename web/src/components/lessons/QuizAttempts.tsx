@@ -36,7 +36,7 @@ export const QuizAttempts = ({ lessonId }: { lessonId: string }) => {
   } = useQuizAttempts(lessonId);
 
   const startQuiz = () => {
-    navigate(`/lessons/${lessonId}/quiz/`, { replace: true });
+    navigate(`/chapters/${lessonId}/quiz/`, { replace: true });
   };
 
   const handleReviewClick = (attempt: QuizAttemptOut) => {

@@ -1,111 +1,61 @@
-import { useAuthStore } from '@/stores/authStore';
-import { Link } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { useAuthStore } from "@/stores/authStore";
+import { Link } from "react-router-dom";
+import { Menu, X } from "lucide-react";
+import { useState } from "react";
+import { BrandMark } from "@/components/brand/BrandMark";
 
 export default function Header() {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, clearAuth } = useAuthStore();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-700">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-4 md:py-6">
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="flex items-center space-x-2 cursor-pointer">
-              <img src="/logo.png" alt="khan education logo" className='w-16 h-16' />
-              <span className="text-xl font-bold text-gray-900 dark:text-gray-100">Khan Education</span>
-            </div>
-          </Link>
-
-          <nav className="hidden md:flex space-x-10">
-            <button onClick={() => scrollToSection('features')} className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">Features</button>
-            <button onClick={() => scrollToSection('how-it-works')} className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">How It Works</button>
-            <button onClick={() => scrollToSection('testimonials')} className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">Testimonials</button>
-            <button onClick={() => scrollToSection('pricing')} className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">Pricing</button>
+    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/75 backdrop-blur-xl">
+      <div className="mx-auto max-w-6xl px-5 md:px-8">
+        <div className="flex items-center justify-between py-4">
+          <BrandMark />
+          <nav className="hidden items-center gap-8 md:flex">
+            <button onClick={() => scrollToSection("features")} className="text-[0.78rem] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground">
+              Features
+            </button>
+            <button onClick={() => scrollToSection("how-it-works")} className="text-[0.78rem] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground">
+              How it works
+            </button>
+            <button onClick={() => scrollToSection("testimonials")} className="text-[0.78rem] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground">
+              Voices
+            </button>
           </nav>
-
-          <div className="flex items-center space-x-4">
-            <div className="hidden md:flex items-center space-x-4">
-              {!isLoading && (isAuthenticated ? (
-                  <>
-                  <button
-                    onClick={useAuthStore.getState().clearAuth}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-xl transition-colors"
-                  >
+          <div className="hidden items-center gap-3 md:flex">
+            {!isLoading &&
+              (isAuthenticated ? (
+                <>
+                  <button onClick={clearAuth} className="text-sm text-muted-foreground hover:text-foreground">
                     Logout
                   </button>
-
-                  <Link 
-                    to='/dashboard'
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-xl transition-colors"
-                  >
+                  <Link to="/dashboard" className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground">
                     Go to Dashboard
                   </Link>
-                  </>
-              ) : (
-                <>
-        
-                  <Link 
-                    to='/login'
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-xl transition-colors"
-                  >
-                    Get Started
-                  </Link>
                 </>
+              ) : (
+                <Link to="/login" className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground">
+                  Get Started
+                </Link>
               ))}
-            </div>
-            <div className="md:hidden">
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-800 dark:text-gray-200">
-                {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
-            </div>
           </div>
+          <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
-        {isMenuOpen && (
-          <div className="md:hidden">
-            <nav className="flex flex-col space-y-4 pb-4">
-              <button onClick={() => {scrollToSection('features'); setIsMenuOpen(false);}} className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">Features</button>
-              <button onClick={() => {scrollToSection('how-it-works'); setIsMenuOpen(false);}} className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">How It Works</button>
-              <button onClick={() => {scrollToSection('testimonials'); setIsMenuOpen(false);}} className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">Testimonials</button>
-              <button onClick={() => {scrollToSection('pricing'); setIsMenuOpen(false);}} className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">Pricing</button>
-              {!isLoading && (isAuthenticated ? (
-                  <>
-                  <button
-                    onClick={useAuthStore.getState().clearAuth}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-xl transition-colors"
-                  >
-                    Logout
-                  </button>
-
-                  <Link 
-                    to='/dashboard'
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-xl transition-colors text-center"
-                  >
-                    Go to Dashboard
-                  </Link>
-                  </>
-              ) : (
-                <>
-        
-                  <Link 
-                    to='/login'
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-xl transition-colors text-center"
-                  >
-                    Get Started
-                  </Link>
-                </>
-              ))}
-            </nav>
-          </div>
-        )}
+        {isMenuOpen ? (
+          <nav className="flex flex-col gap-3 pb-4 md:hidden">
+            <Link to="/login" className="rounded-full bg-primary px-5 py-2 text-center text-sm text-primary-foreground">
+              Get Started
+            </Link>
+          </nav>
+        ) : null}
       </div>
     </header>
   );

@@ -3,7 +3,7 @@ import { Navbar } from "./Navbar";
 
 const MainLayout = () => {
   return (
-    <div>
+    <div className="min-h-screen">
       <Navbar />
       <main>
         <Outlet />

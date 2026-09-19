@@ -11,8 +11,17 @@ fix:
 format:
 	uv run ruff format
 
-dev: 
+dev:
 	uv run fastapi run
+
+db:
+	docker compose up -d db
+
+migrate:
+	uv run alembic upgrade head
+
+seed:
+	uv run python seed_db.py
 
 
 
@@ -33,9 +42,9 @@ build:
 
 	@echo "Running Docker container..."
 	docker run -p 8080:8080 \
-		-e GEMINI_API_KEY=${GEMINI_API_KEY} \
 		-e SECRET_KEY=${SECRET_KEY} \
 		-e DEBUG=True \
+		-e DATABASE_URL=${DATABASE_URL} \
 		khaneducation-lambda
 
 # deploy:

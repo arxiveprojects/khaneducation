@@ -1,33 +1,39 @@
-# app/main.py
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from mangum import Mangum
-from .ai import generate_content as ai
-from . import schemas
-from . import routers
-from .dependencies import get_current_student
 
-# --- PynamoDB Import ---
-from .models import Subject, Lesson, Student  # Import models needed for AI context
+from .config import settings
+from .database import init_db
+from .routers import assistant, auth, books, chapters, dashboard, embed, jobs, quiz, schools, subjects, teachers, users
 
-app = FastAPI(version="1.0.0")
-origins = ["*"]
+app = FastAPI(title="Khan Education", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(routers.user_profile.router)
-app.include_router(routers.auth.router)
-app.include_router(routers.subject.router)
-app.include_router(routers.lesson.router)
-app.include_router(routers.quiz.router)
-app.include_router(routers.dashboard.router)
-app.include_router(routers.admin.router)
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(schools.router)
+app.include_router(teachers.router)
+app.include_router(subjects.router)
+app.include_router(books.router)
+app.include_router(chapters.router)
+app.include_router(jobs.router)
+app.include_router(dashboard.router)
+app.include_router(assistant.router)
+app.include_router(quiz.router)
+app.include_router(embed.router)
+
+
+@app.on_event("startup")
+def on_startup():
+    if settings.debug:
+        init_db()
 
 
 @app.get("/")
@@ -35,32 +41,14 @@ def root():
     return RedirectResponse("/docs")
 
 
-@app.get("/languages", response_model=list[schemas.LanguageChoicesEnum])  # Use list type hint
-def get_languages():
-    return list(schemas.LanguageChoicesEnum)
+@app.get("/health")
+def health():
+    return {"ok": True}
 
 
-@app.post("/ai/assist", response_model=dict)
-async def assist_user(request: schemas.AIContentRequest, current_student: Student = Depends(get_current_student)):
-    try:
-        subject = Subject.get(request.subject_id)  # Fetch Subject by hash key (id)
-    except Subject.DoesNotExist:
-        subject = None
-    language = current_student.language
-    lesson_content = ""
-    if request.lesson_id:
-        try:
-            lesson = Lesson.get(request.lesson_id)  # hash_key, range_key
-            lesson_content = f"{lesson.title}" if lesson else ""
-            lesson_content += f"\n{lesson.content}" if lesson else ""
-        except Lesson.DoesNotExist:
-            lesson = None
-            lesson_content = ""
-
-    context = f"Subject: {subject.name}, Lesson: {lesson_content}"
-    # --- End Fetch Context ---
-    response = await ai.ai_assistant(request.user_messages, context, language)
-    return {"ai_response": response}
+@app.get("/languages")
+def languages():
+    return ["Arabic", "English", "Pashto", "Persian", "Urdu"]
 
 
 handler = Mangum(app)

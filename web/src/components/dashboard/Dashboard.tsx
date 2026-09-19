@@ -5,221 +5,112 @@ import { Badge } from "@/components/ui/badge";
 import { useStudentDashboard } from "@/hooks/useApiQueries";
 import { Link } from "react-router-dom";
 import { Skeleton } from "../ui/skeleton";
-import { Calculator, Atom, FlaskConical, Dna, Code, Terminal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { useAuthStore } from "@/stores/authStore";
 
-const subjectIcons: { [key: string]: JSX.Element } = {
-  Mathematics: <Calculator className="w-6 h-6 text-primary" />,
-  Physics: <Atom className="w-6 h-6 text-primary" />,
-  Chemistry: <FlaskConical className="w-6 h-6 text-primary" />,
-  Biology: <Dna className="w-6 h-6 text-primary" />,
-  "Computer Science": <Code className="w-6 h-6 text-primary" />,
-};
-
- const onRefresh = () => {
-    window.location.reload();
-  };
 export const Dashboard = () => {
+  const { profile } = useAuthStore();
   const { data: dashboardData, isLoading, error } = useStudentDashboard();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-primary/5 p-6">
-        <Skeleton className="h-10 w-48 mb-8" />
-        <Skeleton className="h-16 w-full mb-4" />
-        <div className="space-y-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
+      <div className="page-shell">
+        <Skeleton className="mb-8 h-12 w-64" />
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
         </div>
       </div>
     );
   }
 
-
   if (error) {
-      return (
-        <div className="min-h-screen">
-          <div className="max-w-4xl mx-auto px-6 py-8 flex items-center justify-center">
-            <Alert variant="destructive" className="max-w-lg shadow-lg">
-              <Terminal className="h-4 w-4" />
-              <AlertTitle>Error Loading Dashboard</AlertTitle>
-              <AlertDescription className="mt-2">
-                There was a problem  fetching the dashboard data. Please check your connection and try again.
-                <Button onClick={onRefresh} variant="link" className="p-0 h-auto mt-3 text-red-600">
-                  Refresh the page.
-                </Button>
-              </AlertDescription>
-            </Alert>
-          </div>
-        </div>
-      );
-    }
+    return (
+      <div className="page-shell flex items-center justify-center">
+        <Alert variant="destructive" className="max-w-lg">
+          <AlertTitle>Error Loading Dashboard</AlertTitle>
+          <AlertDescription className="mt-2">
+            There was a problem fetching the dashboard data.
+            <Button onClick={() => window.location.reload()} variant="link" className="mt-3 h-auto p-0">
+              Refresh the page.
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   const { enrollments: enrolledSubjects, stats } = dashboardData;
-
-  const { completed_lessons, total_lessons, avg_score, streak } = stats;
+  const completed_lessons = stats.completed_chapters ?? stats.completed_lessons ?? 0;
+  const total_lessons = stats.total_chapters ?? stats.total_lessons ?? 0;
+  const { avg_score, streak } = stats;
+  const firstName = profile?.user.first_name || profile?.user.username || "there";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-primary/5">
-      {/* Header */}
-
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Stats Overview with staggered animations */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card
-            variant="elevated"
-            className="animate-spring-in"
-            style={{ animationDelay: "0.1s" }}
-          >
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground md:text-sm">
-                    Progress
-                  </p>
-                  <p className="text-lg font-bold md:text-2xl">
-                    {Math.round((completed_lessons / total_lessons) * 100) || 0}
-                    %
-                  </p>
-                </div>
-                <div className="text-xl md:text-2xl animate-float">📈</div>
-              </div>
-              <Progress
-                value={(completed_lessons / total_lessons) * 100 || 0}
-                className="mt-2 hidden md:block"
-              />
-            </CardContent>
-          </Card>
-
-          <Card
-            variant="elevated"
-            className="animate-spring-in"
-            style={{ animationDelay: "0.2s" }}
-          >
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground md:text-sm">
-                    Avg Score
-                  </p>
-                  <p className="text-lg font-bold text-success md:text-2xl">
-                    {(avg_score.toFixed(0))}%
-                  </p>
-                </div>
-                <div
-                  className="text-xl md:text-2xl animate-float"
-                  style={{ animationDelay: "0.5s" }}
-                >
-                  🎯
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card
-            variant="elevated"
-            className="animate-spring-in"
-            style={{ animationDelay: "0.3s" }}
-          >
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground md:text-sm">
-                    Lessons
-                  </p>
-                  <p className="text-lg font-bold md:text-2xl">
-                    {completed_lessons}/{total_lessons}
-                  </p>
-                </div>
-                <div
-                  className="text-xl md:text-2xl animate-float"
-                  style={{ animationDelay: "1s" }}
-                >
-                  📚
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card
-            variant="floating"
-            className="animate-spring-in"
-            style={{ animationDelay: "0.4s" }}
-          >
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground md:text-sm">
-                    Streak
-                  </p>
-                  <p className="text-lg font-bold text-warning md:text-2xl">
-                    {streak} days
-                  </p>
-                </div>
-                <div className="text-xl md:text-2xl">🔥</div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
+    <div className="page-shell">
+      <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          {/* Enrolled Subjects */}
-          <h2 className="text-2xl font-bold mb-6">Your Subjects</h2>
-          <div
-            className="animate-slide-up-fade col-span-1 grid grid-cols-1 lg:grid-cols-2 gap-4"
-            style={{ animationDelay: "0.6s" }}
-          >
-            {enrolledSubjects.map((subject, index) => (
-              <Link
-                to={`/subjects/${subject.id}`}
-                key={subject.id}
-                className=""
-              >
-                <Card
-                  key={subject.id}
-                  variant="interactive"
-                  className="animate-spring-in mb-4"
-                  style={{ animationDelay: `${0.8 + index * 0.1}s` }}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          {subjectIcons[subject.name]}
-                          <h3 className="text-lg font-semibold">
-                            {subject.name}
-                          </h3>
-                        </div>
-                        <p className="text-muted-foreground text-sm mb-3">
-                          {subject.description}
-                        </p>
-
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge variant="secondary">
-                            Grade {subject.grade_level}
-                          </Badge>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm text-muted-foreground">
-                            Progress: {subject.progress || 0}% complete
-                          </div>
-                          <Button variant="glass" size="sm">
-                            Continue Learning
-                          </Button>
-                        </div>
-
-                        <Progress value={subject.progress} className="mt-2" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
+          <p className="text-[0.72rem] uppercase tracking-[0.28em] text-muted-foreground">Student studio</p>
+          <h1 className="mt-2 font-display text-5xl leading-none">Good work, {firstName}.</h1>
+          <p className="mt-3 max-w-xl text-muted-foreground">
+            Your subjects, cited chapters, and streak — kept on one quiet desk.
+          </p>
         </div>
+        <Link to="/schools" className="text-sm text-primary underline-offset-4 hover:underline">
+          Browse schools
+        </Link>
+      </div>
+
+      <div className="mb-12 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <StatCard label="Progress" value={`${Math.round((completed_lessons / total_lessons) * 100) || 0}%`} bar={(completed_lessons / total_lessons) * 100 || 0} />
+        <StatCard label="Avg Score" value={`${avg_score.toFixed(0)}%`} />
+        <StatCard label="Lessons" value={`${completed_lessons}/${total_lessons}`} />
+        <StatCard label="Streak" value={`${streak} days`} />
+      </div>
+
+      <div className="mb-5 flex items-end justify-between">
+        <h2 className="font-display text-3xl">Your Subjects</h2>
+        <span className="text-sm text-muted-foreground">{enrolledSubjects.length} enrolled</span>
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {enrolledSubjects.map((subject) => (
+          <Link to={`/subjects/${subject.id}`} key={subject.id}>
+            <Card variant="interactive" className="h-full">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="text-[0.68rem] uppercase tracking-[0.22em] text-muted-foreground">Subject</p>
+                    <h3 className="mt-1 font-display text-2xl">{subject.name}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">{subject.description}</p>
+                    <div className="mt-4 flex items-center gap-2">
+                      <Badge variant="secondary">Grade {subject.grade_level}</Badge>
+                    </div>
+                    <div className="mt-5 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Progress: {subject.progress || 0}% complete</span>
+                      <Button size="sm" variant="outline">
+                        Continue Learning
+                      </Button>
+                    </div>
+                    <Progress value={subject.progress} className="mt-3" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
       </div>
     </div>
   );
 };
+
+const StatCard = ({ label, value, bar }: { label: string; value: string; bar?: number }) => (
+  <Card variant="elevated">
+    <CardContent className="p-5">
+      <p className="text-[0.68rem] uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      <p className="mt-2 font-display text-3xl">{value}</p>
+      {typeof bar === "number" ? <Progress value={bar} className="mt-3 hidden md:block" /> : null}
+    </CardContent>
+  </Card>
+);

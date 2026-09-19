@@ -1,23 +1,114 @@
-# app/models.py
-from pynamodb.models import Model
-from pynamodb.attributes import UnicodeAttribute, NumberAttribute, UTCDateTimeAttribute, BooleanAttribute, ListAttribute, MapAttribute, JSONAttribute
-from pynamodb.indexes import GlobalSecondaryIndex, AllProjection, KeysOnlyProjection, IncludeProjection
-from .config import settings
+from __future__ import annotations
+
 import enum
 import uuid
-from datetime import datetime, timezone
-from typing import List
+from datetime import date, datetime, timezone
+from typing import Any, Optional
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Index,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .database import Base
 
 
-class UserRoleEnum(enum.Enum):
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def new_id() -> str:
+    return str(uuid.uuid4())
+
+
+class AccountType(str, enum.Enum):
     STUDENT = "student"
-    INSTRUCTOR = "instructor"
-    CONTENT_MANAGER = "content_manager"
-    STAFF = "staff"
+    TEACHER = "teacher"
+    SCHOOL_ADMIN = "school_admin"
+
+
+class MembershipRole(str, enum.Enum):
+    OWNER = "owner"
     ADMIN = "admin"
+    TEACHER = "teacher"
+    STUDENT = "student"
 
 
-class LanguageChoicesEnum(enum.Enum):
+class MembershipStatus(str, enum.Enum):
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+    LEFT = "left"
+
+
+class InvitationStatus(str, enum.Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    EXPIRED = "expired"
+
+
+class ApplicationStatus(str, enum.Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
+class BookStatus(str, enum.Enum):
+    UPLOADED = "uploaded"
+    TOC_RUNNING = "toc_running"
+    TOC_READY = "toc_ready"
+    GENERATING = "generating"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class ChapterStatus(str, enum.Enum):
+    PENDING = "pending"
+    QUEUED = "queued"
+    GENERATING = "generating"
+    VECTORIZING = "vectorizing"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class JobType(str, enum.Enum):
+    TOC = "toc"
+    GENERATE_CHAPTER = "generate_chapter"
+    VECTORIZE = "vectorize"
+
+
+class JobStatus(str, enum.Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class EnrollmentStatus(str, enum.Enum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    DROPPED = "dropped"
+
+
+class AttendanceStatus(str, enum.Enum):
+    PRESENT = "present"
+    ABSENT = "absent"
+    LATE = "late"
+    EXCUSED = "excused"
+
+
+class LanguageChoices(str, enum.Enum):
     AR = "Arabic"
     EN = "English"
     PS = "Pashto"
@@ -25,405 +116,279 @@ class LanguageChoicesEnum(enum.Enum):
     UR = "Urdu"
 
 
-class LessonStatusEnum(enum.Enum):
-    DRAFT = "draft"
-    VERIFIED = "verified"
-    PUBLISHED = "published"
-    ARCHIVED = "archived"
-    PENDING = "pending"
-    FAILED = "failed"
+class TimestampMixin:
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
-class DifficultyLevelEnum(enum.Enum):
-    EASY = "easy"
-    MEDIUM = "medium"
-    HARD = "hard"
+class User(TimestampMixin, Base):
+    __tablename__ = "users"
 
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    first_name: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    last_name: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password: Mapped[str] = mapped_column(String(255))
+    account_type: Mapped[AccountType] = mapped_column(Enum(AccountType, name="account_type"), default=AccountType.STUDENT)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-class QuestionTypeEnum(enum.Enum):
-    MULTIPLE_CHOICE = "multiple_choice"
-    MULTIPLE_OPTION = "multiple_option"
-    TRUE_FALSE = "true_false"
-    SHORT_ANSWER = "short_answer"
-    ESSAY = "essay"
+    student_profile: Mapped[Optional["StudentProfile"]] = relationship(back_populates="user", uselist=False)
+    teacher_profile: Mapped[Optional["TeacherProfile"]] = relationship(back_populates="user", uselist=False)
+    memberships: Mapped[list["SchoolMembership"]] = relationship(back_populates="user")
 
 
-# --- Base Model ---
-class BaseModel(Model):
-    class Meta:
-        region = settings.aws_region
-        # host = settings.dynamodb_endpoint_url
-        # aws_access_key_id = settings.aws_access_key_id
-        # aws_secret_access_key = settings.aws_secret_access_key
-        billing_mode = "PAY_PER_REQUEST"
+class StudentProfile(TimestampMixin, Base):
+    __tablename__ = "student_profiles"
 
-    created_at = UTCDateTimeAttribute(default_for_new=lambda: datetime.now(timezone.utc))
-    updated_at = UTCDateTimeAttribute(default=lambda: datetime.now(timezone.utc))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    current_grade: Mapped[int] = mapped_column(Integer, default=1)
+    language: Mapped[str] = mapped_column(String(32), default=LanguageChoices.EN.value)
+    date_of_birth: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    parent_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    def save(self, **kwargs):
-        """Override save to update the updated_at timestamp"""
-        self.updated_at = datetime.now(timezone.utc)
-        super().save(**kwargs)
+    user: Mapped[User] = relationship(back_populates="student_profile")
 
 
-# --- Define Global Secondary Indexes (GSI) ---
-class UserEmailIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "email-index"
-        projection = AllProjection()  # More efficient for lookups
+class TeacherProfile(TimestampMixin, Base):
+    __tablename__ = "teacher_profiles"
 
-    email = UnicodeAttribute(hash_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    availability_open: Mapped[bool] = mapped_column(Boolean, default=False)
+    offered_subjects: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
 
+    user: Mapped[User] = relationship(back_populates="teacher_profile")
 
-class UsernameIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "username-index"
-        projection = KeysOnlyProjection()
 
-    username = UnicodeAttribute(hash_key=True)
+class School(TimestampMixin, Base):
+    __tablename__ = "schools"
 
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(160))
+    slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
 
-class UserRoleIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "role-index"
-        projection = KeysOnlyProjection()
+    memberships: Mapped[list["SchoolMembership"]] = relationship(back_populates="school")
+    subjects: Mapped[list["Subject"]] = relationship(back_populates="school")
 
-    role = UnicodeAttribute(hash_key=True)
-    created_at = UTCDateTimeAttribute(range_key=True)
 
+class SchoolMembership(TimestampMixin, Base):
+    __tablename__ = "school_memberships"
+    __table_args__ = (UniqueConstraint("school_id", "user_id", name="uq_membership_school_user"),)
 
-# --- Main Models ---
-class User(BaseModel):
-    class Meta(BaseModel.Meta):
-        table_name = "khaneducation_users"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    school_id: Mapped[str] = mapped_column(ForeignKey("schools.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    role: Mapped[MembershipRole] = mapped_column(Enum(MembershipRole, name="membership_role"))
+    status: Mapped[MembershipStatus] = mapped_column(
+        Enum(MembershipStatus, name="membership_status"), default=MembershipStatus.ACTIVE
+    )
 
-    id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
+    school: Mapped[School] = relationship(back_populates="memberships")
+    user: Mapped[User] = relationship(back_populates="memberships")
 
-    username = UnicodeAttribute()
-    first_name = UnicodeAttribute(null=True)
-    last_name = UnicodeAttribute(null=True)
-    email = UnicodeAttribute()
-    password = UnicodeAttribute()  # Should be hashed
-    role = UnicodeAttribute(default=UserRoleEnum.STUDENT.value)
-    is_active = BooleanAttribute(default=True)
-    last_login = UTCDateTimeAttribute(null=True)
-    email_verified = BooleanAttribute(default=False)
 
-    # Define GSIs
-    email_index = UserEmailIndex()
-    username_index = UsernameIndex()
-    role_index = UserRoleIndex()
+class SchoolInvitation(TimestampMixin, Base):
+    __tablename__ = "school_invitations"
 
-    @property
-    def full_name(self) -> str:
-        """Get user's full name"""
-        if self.first_name and self.last_name:
-            return f"{self.first_name} {self.last_name}"
-        return self.username or self.email.split("@")[0]
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    school_id: Mapped[str] = mapped_column(ForeignKey("schools.id", ondelete="CASCADE"), index=True)
+    teacher_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    invited_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[InvitationStatus] = mapped_column(
+        Enum(InvitationStatus, name="invitation_status"), default=InvitationStatus.PENDING
+    )
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    school: Mapped[School] = relationship()
+    teacher: Mapped[User] = relationship(foreign_keys=[teacher_user_id])
+
+
+class StudentApplication(TimestampMixin, Base):
+    __tablename__ = "student_applications"
 
-
-class SubjectGradeLevelIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "grade-level-index"
-        projection = AllProjection()
-
-    grade_level = NumberAttribute(hash_key=True)
-
-
-class Subject(BaseModel):
-    class Meta(BaseModel.Meta):
-        table_name = "khaneducation_subjects"
-
-    id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
-
-    name = UnicodeAttribute()
-    description = UnicodeAttribute(null=True)
-    grade_level = NumberAttribute()
-    is_active = BooleanAttribute(default=True)
-    prerequisites = ListAttribute(of=UnicodeAttribute, null=True)  # List of subject IDs
-
-    # GSI for querying by grade level and language
-    grade_level_index = SubjectGradeLevelIndex()
-
-
-class LessonSubjectIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "subject-index"
-        projection = AllProjection()
-
-    subject_id = UnicodeAttribute(hash_key=True)
-    id = UnicodeAttribute(range_key=True)  # Lesson ID as range key
-
-
-class LessonSubjectLanguageIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "subject-language-index"
-        projection = IncludeProjection(["id","language","title","order_in_subject","subject_id"])  # Only project selected attrs
-
-    subject_id = UnicodeAttribute(hash_key=True)
-    language = UnicodeAttribute(range_key=True)
-
-
-class LessonInstructorIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "instructor-index"
-        projection = AllProjection()
-
-    instructor_id = UnicodeAttribute(hash_key=True)
-    created_at = UTCDateTimeAttribute(range_key=True)
-
-
-class LessonStatusIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "status-index"
-        projection = AllProjection()
-
-    status = UnicodeAttribute(hash_key=True)
-    created_at =  UTCDateTimeAttribute(range_key=True)
-
-
-class Lesson(BaseModel):
-    class Meta(BaseModel.Meta):
-        table_name = "khaneducation_lessons"
-
-    id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
-
-    subject_id = UnicodeAttribute()
-    instructor_id = UnicodeAttribute()
-    title = UnicodeAttribute()
-    language = UnicodeAttribute()
-    content = UnicodeAttribute()
-    summary = UnicodeAttribute(null=True)  # Brief lesson summary
-    learning_objectives = ListAttribute(of=UnicodeAttribute, null=True)
-    status = UnicodeAttribute(default=LessonStatusEnum.DRAFT.value)
-    difficulty = UnicodeAttribute(default=DifficultyLevelEnum.MEDIUM.value)
-    estimated_duration_minutes = NumberAttribute(null=True)
-    order_in_subject = NumberAttribute(null=True)  # For sequencing lessons
-    verified_at = UTCDateTimeAttribute(null=True)
-    verified_by = UnicodeAttribute(null=True)  # User ID who verified
-    tags = ListAttribute(of=UnicodeAttribute, null=True)
-
-    # GSIs for efficient querying
-    subject_index = LessonSubjectIndex()
-    subject_and_language_index = LessonSubjectLanguageIndex()
-    instructor_index = LessonInstructorIndex()
-    status_index = LessonStatusIndex()
-
-
-
-
-class StudentByGradeAndLanguageIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "student-grade-language-index"
-        projection = AllProjection()
-
-    current_grade = NumberAttribute(hash_key=True)
-    language = UnicodeAttribute(range_key=True)
-
-
-class EnrollmentAttribute(MapAttribute):
-    subject_id = UnicodeAttribute()
-    enrolled_at = UTCDateTimeAttribute()
-    status = UnicodeAttribute(default="active")  # active, completed, dropped
-
-
-class Student(BaseModel):
-    class Meta(BaseModel.Meta):
-        table_name = "khaneducation_students"
-
-    user_id = UnicodeAttribute(hash_key=True)  # Link to User
-    current_grade = NumberAttribute(range_key=True)  # Current grade level
-    language = UnicodeAttribute(default=LanguageChoicesEnum.EN.value)
-    date_of_birth = UTCDateTimeAttribute(null=True)
-    parent_email = UnicodeAttribute(null=True)
-    learning_preferences = JSONAttribute(null=True)  # Store learning style preferences
-
-    # Use proper list attribute for enrollments
-    enrollments = ListAttribute(of=EnrollmentAttribute, null=True)
-    grade_language_index = StudentByGradeAndLanguageIndex()
-
-    def add_enrollment(self, subject_id: str, enrolled_at: datetime = None, status: str = "active"):
-        """Add a new enrollment"""
-        if not enrolled_at:
-            enrolled_at = datetime.now(timezone.utc)
-
-        if not self.enrollments:
-            self.enrollments = []
-
-        # Check if already enrolled
-        existing_enrollment = next((e for e in self.enrollments if e.subject_id == subject_id), None)
-        if existing_enrollment:
-            existing_enrollment.status = status
-            return
-
-        enrollment = EnrollmentAttribute()
-        enrollment.subject_id = subject_id
-        enrollment.enrolled_at = enrolled_at
-        enrollment.status = status
-
-        self.enrollments.append(enrollment)
-
-    def get_active_enrollments(self) -> List[EnrollmentAttribute]:
-        """Get all active enrollments"""
-        if not self.enrollments:
-            return []
-        return [e for e in self.enrollments if e.status == "active"]
-
-
-class PracticeTaskByLessonIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "practice-task-lesson-index"
-        projection = AllProjection()
-
-    lesson_id = UnicodeAttribute(hash_key=True)
-
-
-class PracticeTask(BaseModel):
-    class Meta(BaseModel.Meta):
-        table_name = "khaneducation_practice_tasks"
-
-    id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
-
-    lesson_id = UnicodeAttribute(range_key=True)
-    lesson_title = UnicodeAttribute()
-    content = UnicodeAttribute()
-    solution = UnicodeAttribute()
-    instructions = UnicodeAttribute(null=True)
-    difficulty = UnicodeAttribute(default=DifficultyLevelEnum.MEDIUM.value)
-    ai_generated = BooleanAttribute(default=True)
-    lesson_index = PracticeTaskByLessonIndex()
-
-
-class QuizQuestionAttribute(MapAttribute):
-    question_id = UnicodeAttribute()
-    question_text = UnicodeAttribute()
-    question_type = UnicodeAttribute()
-    options = ListAttribute(of=UnicodeAttribute, null=True)
-    correct_answer = UnicodeAttribute(null=True)
-
-
-class QuizResponseAttribute(MapAttribute):
-    question_id = UnicodeAttribute()
-    student_answer = UnicodeAttribute()
-    is_correct = BooleanAttribute()
-
-
-class QuizByLessonStudentIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "quiz-lesson-student-index"
-        projection = AllProjection()
-
-    lesson_id = UnicodeAttribute(hash_key=True)
-    student_id = UnicodeAttribute(range_key=True)
-
-
-class QuizBySubjectStudentIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "quiz-subject-student-index"
-        projection = AllProjection()
-
-    subject_id = UnicodeAttribute(hash_key=True)
-    student_id = UnicodeAttribute(range_key=True)
-
-class QuizByStudentIndex(GlobalSecondaryIndex):
-    class Meta:
-        index_name = "quiz-student-index"
-        projection = AllProjection()
-
-    student_id = UnicodeAttribute(hash_key=True)
-
-QUIZ_PASSING_SCORE = 70
-
-
-class Quiz(BaseModel):
-    class Meta(BaseModel.Meta):
-        table_name = "khaneducation_quizzes"
-
-    id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
-    student_id = UnicodeAttribute()
-    subject_id = UnicodeAttribute()
-    lesson_id = UnicodeAttribute()
-    lesson_title = UnicodeAttribute()
-    quiz_version = NumberAttribute(default=1)
-    start_time = UTCDateTimeAttribute(default_for_new=lambda: datetime.now(timezone.utc))
-    end_time = UTCDateTimeAttribute(null=True)
-    time_taken_minutes = NumberAttribute(null=True)
-    ai_feedback = UnicodeAttribute(null=True)
-    score = NumberAttribute(null=True)
-    passed = BooleanAttribute(default=False)
-    cheating_detected = BooleanAttribute(default=False)
-
-    # Use proper list attribute for questions
-    quiz_questions = ListAttribute(of=QuizQuestionAttribute, null=True)
-    # Use proper list attribute for responses
-    responses = ListAttribute(of=QuizResponseAttribute, null=True)
-
-    lesson_student_index = QuizByLessonStudentIndex()
-    student_index = QuizByStudentIndex()
-    subject_student_index = QuizBySubjectStudentIndex()
-
-    def add_question(self, question_text: str, question_type: str, options: List[str] = None, correct_answer: str = None):
-        """Add a question to the quiz"""
-        if not self.quiz_questions:
-            self.quiz_questions = []
-
-        question = QuizQuestionAttribute()
-        question.question_id = str(uuid.uuid4())
-        question.question_text = question_text
-        question.question_type = question_type
-        question.options = options
-        question.correct_answer = correct_answer
-
-        self.quiz_questions.append(question)
-
-    def add_response(self, question_id: str, student_answer: str, is_correct: bool):
-        """Add a response to the quiz attempt"""
-        if not self.responses:
-            self.responses = []
-
-        response = QuizResponseAttribute()
-        response.question_id = question_id
-        response.student_answer = student_answer
-        response.is_correct = is_correct
-
-        self.responses.append(response)
-
-    def calculate_score(self):
-        """Calculate the total score and percentage"""
-        if not self.responses:
-            self.score = 0
-            return
-
-        # Get quiz to calculate percentage
-        total_correct = sum([int(r.is_correct) for r in self.responses])
-        self.score = (total_correct / len(self.responses)) * 100
-
-        if self.score >= QUIZ_PASSING_SCORE:
-            self.passed = True
-        else:
-            self.passed = False
-
-    def finish_quiz(self):
-        """Mark the attempt as finished"""
-        self.end_time = datetime.now(timezone.utc)
-        if self.start_time:
-            time_diff = self.end_time - self.start_time
-            self.time_taken_minutes = round(time_diff.total_seconds() / 60, 2)
-        self.calculate_score()
-
-# --- Additional Models for Enhanced Functionality ---
-
-
-class Notification(BaseModel):
-    class Meta(BaseModel.Meta):
-        table_name = "khaneducation_notifications"
-
-    id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
-
-    user_id = UnicodeAttribute()
-    title = UnicodeAttribute()
-    message = UnicodeAttribute()
-    notification_type = UnicodeAttribute()  # info, warning, success, error
-    is_read = BooleanAttribute(default=False)
-    action_url = UnicodeAttribute(null=True)
-    expires_at = UTCDateTimeAttribute(null=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    school_id: Mapped[str] = mapped_column(ForeignKey("schools.id", ondelete="CASCADE"), index=True)
+    student_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    grade_level: Mapped[int] = mapped_column(Integer)
+    status: Mapped[ApplicationStatus] = mapped_column(
+        Enum(ApplicationStatus, name="application_status"), default=ApplicationStatus.PENDING
+    )
+    reviewed_by: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    school: Mapped[School] = relationship()
+    student: Mapped[User] = relationship(foreign_keys=[student_user_id])
+
+
+class Subject(TimestampMixin, Base):
+    __tablename__ = "subjects"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    school_id: Mapped[str] = mapped_column(ForeignKey("schools.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    grade_level: Mapped[int] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    school: Mapped[School] = relationship(back_populates="subjects")
+    books: Mapped[list["Book"]] = relationship(back_populates="subject")
+    assignments: Mapped[list["TeacherSubjectAssignment"]] = relationship(back_populates="subject")
+    enrollments: Mapped[list["ClassEnrollment"]] = relationship(back_populates="subject")
+
+
+class TeacherSubjectAssignment(TimestampMixin, Base):
+    __tablename__ = "teacher_subject_assignments"
+    __table_args__ = (UniqueConstraint("subject_id", "teacher_user_id", name="uq_assignment_subject_teacher"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    school_id: Mapped[str] = mapped_column(ForeignKey("schools.id", ondelete="CASCADE"), index=True)
+    subject_id: Mapped[str] = mapped_column(ForeignKey("subjects.id", ondelete="CASCADE"), index=True)
+    teacher_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+
+    subject: Mapped[Subject] = relationship(back_populates="assignments")
+    teacher: Mapped[User] = relationship()
+
+
+class Book(TimestampMixin, Base):
+    __tablename__ = "books"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    subject_id: Mapped[str] = mapped_column(ForeignKey("subjects.id", ondelete="CASCADE"), index=True)
+    uploaded_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    title: Mapped[str] = mapped_column(String(255))
+    language: Mapped[str] = mapped_column(String(32), default=LanguageChoices.EN.value)
+    storage_uri: Mapped[str] = mapped_column(String(512))
+    original_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    page_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    toc_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    status: Mapped[BookStatus] = mapped_column(Enum(BookStatus, name="book_status"), default=BookStatus.UPLOADED)
+
+    subject: Mapped[Subject] = relationship(back_populates="books")
+    chapters: Mapped[list["Chapter"]] = relationship(back_populates="book", order_by="Chapter.order_index")
+    jobs: Mapped[list["GenerationJob"]] = relationship(back_populates="book")
+
+
+class Chapter(TimestampMixin, Base):
+    __tablename__ = "chapters"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    book_id: Mapped[str] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    order_index: Mapped[int] = mapped_column(Integer, default=0)
+    page_start: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    page_end: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    status: Mapped[ChapterStatus] = mapped_column(Enum(ChapterStatus, name="chapter_status"), default=ChapterStatus.PENDING)
+    embed_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    vector_namespace: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    slidegen_job_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    book: Mapped[Book] = relationship(back_populates="chapters")
+
+
+class GenerationJob(TimestampMixin, Base):
+    __tablename__ = "generation_jobs"
+    __table_args__ = (Index("ix_jobs_book_status", "book_id", "status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    book_id: Mapped[str] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"), index=True)
+    chapter_id: Mapped[Optional[str]] = mapped_column(ForeignKey("chapters.id", ondelete="SET NULL"), nullable=True)
+    job_type: Mapped[JobType] = mapped_column(Enum(JobType, name="job_type"))
+    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus, name="job_status"), default=JobStatus.QUEUED)
+    progress_pct: Mapped[int] = mapped_column(Integer, default=0)
+    current_step: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    external_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    heartbeat_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    result_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+
+    book: Mapped[Book] = relationship(back_populates="jobs")
+    chapter: Mapped[Optional[Chapter]] = relationship()
+
+
+class ClassEnrollment(TimestampMixin, Base):
+    __tablename__ = "class_enrollments"
+    __table_args__ = (UniqueConstraint("subject_id", "student_user_id", name="uq_enrollment_subject_student"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    school_id: Mapped[str] = mapped_column(ForeignKey("schools.id", ondelete="CASCADE"), index=True)
+    subject_id: Mapped[str] = mapped_column(ForeignKey("subjects.id", ondelete="CASCADE"), index=True)
+    student_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    enrolled_by: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    status: Mapped[EnrollmentStatus] = mapped_column(
+        Enum(EnrollmentStatus, name="enrollment_status"), default=EnrollmentStatus.ACTIVE
+    )
+
+    subject: Mapped[Subject] = relationship(back_populates="enrollments")
+    student: Mapped[User] = relationship(foreign_keys=[student_user_id])
+    attendance_records: Mapped[list["Attendance"]] = relationship(back_populates="enrollment")
+
+
+class Attendance(TimestampMixin, Base):
+    __tablename__ = "attendance"
+    __table_args__ = (UniqueConstraint("enrollment_id", "on_date", name="uq_attendance_enrollment_date"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    enrollment_id: Mapped[str] = mapped_column(ForeignKey("class_enrollments.id", ondelete="CASCADE"), index=True)
+    on_date: Mapped[date] = mapped_column(Date)
+    status: Mapped[AttendanceStatus] = mapped_column(Enum(AttendanceStatus, name="attendance_status"))
+    recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    enrollment: Mapped[ClassEnrollment] = relationship(back_populates="attendance_records")
+
+
+class ChapterProgress(TimestampMixin, Base):
+    __tablename__ = "chapter_progress"
+    __table_args__ = (UniqueConstraint("chapter_id", "student_user_id", name="uq_progress_chapter_student"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    chapter_id: Mapped[str] = mapped_column(ForeignKey("chapters.id", ondelete="CASCADE"), index=True)
+    student_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    time_spent_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    last_concept: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    chapter: Mapped[Chapter] = relationship()
+
+
+class Quiz(TimestampMixin, Base):
+    __tablename__ = "quizzes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    student_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    subject_id: Mapped[str] = mapped_column(ForeignKey("subjects.id", ondelete="CASCADE"), index=True)
+    chapter_id: Mapped[str] = mapped_column(ForeignKey("chapters.id", ondelete="CASCADE"), index=True)
+    chapter_title: Mapped[str] = mapped_column(String(255))
+    quiz_version: Mapped[int] = mapped_column(Integer, default=1)
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    time_taken_minutes: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    ai_feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    questions_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    responses_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+
+
+class ActivityEvent(Base):
+    __tablename__ = "activity_events"
+    __table_args__ = (Index("ix_activity_school_created", "school_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    school_id: Mapped[Optional[str]] = mapped_column(ForeignKey("schools.id", ondelete="SET NULL"), nullable=True, index=True)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    actor_role: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    verb: Mapped[str] = mapped_column(String(64))
+    object_type: Mapped[str] = mapped_column(String(64))
+    object_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    extra: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

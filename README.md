@@ -1,221 +1,139 @@
-# Khan Education 🚀
+# Khan Education
+
+School operating system for multi-tenant schools: enrollments, attendance, activity, and book-based chapter lessons. Khan Education does not generate lesson media itself. It stores school data in PostgreSQL and asks a separate **slidegen** service to extract a table of contents, generate one chapter at a time, and vectorize the chapter with page and paragraph citations.
+
+## What changed
+
+The previous app was a single-tenant lesson site on DynamoDB with in-process Gemini lesson and video generation. That path is gone. The current app is a school OS:
 
-**A modern, full-stack e-learning platform powered by AI-driven content generation and intelligent backend infrastructure.**
+- **Schools and tenancy.** Owner, admin, teacher, and student memberships. Teacher invitations, student applications, subject assignment, and class enrollment.
+- **Books, not freeform lessons.** Staff upload a book to a subject. Slidegen builds the TOC, then generates and vectorizes chapters one at a time.
+- **Isolated chapter player.** Generated HTML/CSS/JS runs in a sandboxed iframe (`allow-scripts` only). The host handles voice (`voice.read`), citations, and progress via `postMessage`.
+- **Operations desk.** Staff see jobs, attendance, activity, and faculty/student performance for a school.
+- **PostgreSQL instead of DynamoDB.** SQLAlchemy 2, Alembic, and `psycopg`. PynamoDB CRUD is removed.
+- **Slidegen instead of in-app AI.** Jobs go out over SQS FIFO (`MessageGroupId=book_id`) or the slidegen HTTP API. Progress comes back through an HMAC webhook. Vectors stay in slidegen namespaces, not in this database.
+
+## How a book becomes chapters
+
+1. A teacher or admin uploads a book on a subject.
+2. Khan Education creates a `TOC` job and enqueues it to slidegen (SQS if `SQS_SLIDEGEN_QUEUE_URL` is set, otherwise `SLIDEGEN_API_URL`). If neither is set, a local stub creates placeholder chapters.
+3. Slidegen posts progress to `/internal/slidegen/webhook`.
+4. After the TOC is ready, the next pending chapter is queued (`GENERATE_CHAPTER`, then vectorize).
+5. The student player loads `/embed/chapters/{chapter_id}` in an iframe. Tooltips can request host TTS and show book page citations. Chapter progress is written from `progress` / `voice.read` messages.
 
-## ✨ Vision
+## Product surfaces
 
-To democratize and revolutionize education by leveraging artificial intelligence to create personalized, engaging, and high-quality learning experiences that adapt to every user's unique needs.
+**Students**
+
+- Apply to a school, see enrolled subjects, play a chapter, take a quiz, and ask the assistant (RAG against the chapter namespace when slidegen is configured).
+- Dashboard: progress, quiz scores, applications.
 
----
+**Teachers and school staff**
 
-## 🎯 Key Features
+- Create a school, invite teachers, review applications, create subjects, assign teachers, enroll students, upload books.
+- Workspace: enrollments, attendance, generation jobs, activity feed, and a performance desk (progress, scores, attendance).
 
-### For Students
+## Tech stack
 
-- **🤖 AI-Powered Assistance:** Integrated AI Tutor for interactive quizzes and a helpful AI Assistant for guided learning
-- **📚 Rich Content Delivery:** Engaging lessons with Markdown support for formatted text, images, and code blocks
-- **🧠 Interactive Quizzing:** Dynamic quizzes powered by AI to test knowledge and provide instant feedback
-- **📊 Personalized Dashboards:** User-specific dashboards to view enrolled subjects and track learning progress
-- **📈 Progress Analytics:** Visualize learning progress and quiz performance with insightful charts
-- **🔍 Smart Search:** Quickly find subjects and lessons across the platform
-- **📱 Responsive Design:** Seamless experience on desktops, tablets, and mobile devices
+| Layer | Choice |
+| --- | --- |
+| API | FastAPI 2.0, Pydantic, JWT |
+| Data | PostgreSQL 16, SQLAlchemy 2, Alembic |
+| Generation | slidegen (SQS FIFO or HTTP) + HMAC webhook |
+| Files | S3 (`S3_BOOKS_BUCKET`) or `LOCAL_UPLOAD_DIR` |
+| Web | React, Vite, TypeScript, Tailwind, shadcn/ui, Zustand, TanStack Query |
+| E2E | Playwright (`web/npm run test:e2e`) |
 
-### For Educators & Admins
+Layout:
 
-- **⚙️ Comprehensive Admin Panel:** Full suite of tools for managing users, subjects, and lessons
-- **🤖 AI-Generated Content:** Dynamically creates comprehensive lessons and quizzes on any subject
-- **🎥 Automated Video Lessons:** Generates complete video lessons with scripts and voiceovers for multi-modal learning
-- **👤 User Management:** Complete system for managing profiles, tracking enrollment, and monitoring progress
+- `app/routers` — HTTP
+- `app/services.py` — school, book, job, dashboard, and webhook logic
+- `app/models.py` / `app/schemas.py` — Postgres models and API contracts
+- `app/clients/slidegen.py` — enqueue and RAG query
+- `app/activity.py` — school activity events
+- `web/src/pages/SchoolWorkspace.tsx` — staff desk
+- `web/src/components/chapters/ChapterPlayer.tsx` — iframe host
 
-### Technical Excellence
+## Local setup
 
-- **scalable & Robust Backend:** Built with **FastAPI** for high performance and reliability
-- **☁️ Automated Cloud Deployment:** Infrastructure managed with **Terraform** and **CI/CD pipeline** via GitHub Actions
-- **🏗️ Modern Architecture:** Clean, layered design for maintainability and extensibility
+Needs Python 3.13+, [uv](https://docs.astral.sh/uv/), Node 18+, Docker, and Git.
 
----
+```bash
+git clone https://github.com/ikram98ai/khaneducation.git
+cd khaneducation
+cp .env.example .env
+# Set SECRET_KEY (openssl rand -base64 32). Leave slidegen URLs empty to use the local stub.
+```
 
-## 🎨 System Design
+```bash
+make db          # postgres:16 on localhost:5432 (user/pass/db: khan / khan / khaneducation)
+make sync        # uv sync
+make migrate     # alembic upgrade head
+make seed        # demo users and a sample school
+make dev         # API at http://127.0.0.1:8000 (docs at /docs)
+```
 
-The system is designed for scalability, maintainability, and high performance, following modern software architecture principles.
+```bash
+cd web
+npm install
+npm run dev      # http://127.0.0.1:5173 — talks to the local API
+```
 
-### System Architecture
+Demo accounts (password `Abc123()`):
 
-_Illustrates the decoupled, service-oriented architecture._
-![System Architecture](./assets/arch.png)
+| Email | Role |
+| --- | --- |
+| `owner@example.com` | School owner |
+| `teacher@example.com` | Teacher |
+| `student@example.com` | Student |
 
-### AI Content Generation Flow
+## Environment
 
-_Details the pipeline from prompt to generated text and video content._
-![AI Content Generation Flow](./assets/aiflow.png)
+See `.env.example`. Important keys:
 
-### Entity-Relationship Diagram (ERD)
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Postgres URL (`postgresql+psycopg://...`) |
+| `SECRET_KEY` | JWT signing key. Required when `DEBUG=false` |
+| `SLIDEGEN_API_URL` / `SLIDEGEN_API_KEY` | HTTP job + RAG API |
+| `SLIDEGEN_WEBHOOK_SECRET` | HMAC for `/internal/slidegen/webhook` |
+| `SLIDEGEN_CALLBACK_BASE_URL` | Public API base slidegen should call back |
+| `SQS_SLIDEGEN_QUEUE_URL` | FIFO queue; takes precedence over HTTP enqueue |
+| `S3_BOOKS_BUCKET` | Book storage; unset uses `LOCAL_UPLOAD_DIR` |
+| `PUBLIC_APP_ORIGIN` | Frontend origin |
 
-_Defines the database schema and relationships between data entities._
-![Entity-Relationship Diagram](./assets/erd.png)
+## API map
 
-### Platform Screenshots
+Interactive docs: `http://127.0.0.1:8000/docs`.
 
-|                               Main Dashboard                               |                            Subject View                            |
-| :------------------------------------------------------------------------: | :----------------------------------------------------------------: |
-|                  ![Main Dashboard](./web/public/main-sc.png)                   |              ![Subject View](./web/public/subject-sc.png)              |
-| **A personalized dashboard for students to track their learning journey.** |         **Detailed subject pages with organized lessons.**         |
-|                             **Lesson & Quiz**                              |                        **Interactive Quiz**                        |
-|                  ![Lesson & Quiz](./web/public/lesson-sc.png)                  |             ![Interactive Quiz](./web/public/quiz-sc.png)              |
-|          **Engaging lessons with tasks and integrated quizzes.**           | **AI-powered quizzes to test understanding and provide feedback.** |
+| Area | Examples |
+| --- | --- |
+| Auth | `POST /auth/register`, `POST /auth/login` |
+| Schools | `GET/POST /schools`, invitations, applications, subjects, enrollments, attendance, jobs, activity, `GET /schools/{id}/performance` |
+| Books | `POST /subjects/{id}/books`, `GET /books/{id}/jobs` |
+| Chapters | `GET /books/{id}/chapters`, `POST /chapters/{id}/progress`, `GET /embed/chapters/{id}` |
+| Jobs | `GET /jobs/{id}`, `POST /internal/slidegen/webhook` |
+| Learning | `GET /chapters/{id}/quiz`, `POST /quizzes/{id}/submit`, `POST /assistant/query` |
 
----
+## Scripts
 
-## 💻 Tech Stack
+**Backend (makefile)**
 
-This project is built with a modern and robust technology stack:
+- `make db` — start Postgres
+- `make migrate` — apply Alembic
+- `make seed` — demo data
+- `make dev` — FastAPI
+- `make lint` / `make format`
 
-| Category             | Technology                                       |
-| -------------------- | ------------------------------------------------ |
-| **Frontend**         | TypeScript, React, Vite, Tailwind CSS, Shadcn/UI |
-| **Backend**          | Python, FastAPI, Pydantic, Pynamodb              |
-| **Database**         | DynamoDB                                         |
-| **AI**               | Generative AI Models (Text & Video)              |
-| **State Management** | Zustand, TanStack Query                          |
-| **DevOps**           | Docker, Terraform, GitHub Actions                |
-| **Tooling**          | `uv` (Python), npm (JavaScript)                  |
+**Frontend**
 
-### Frontend Libraries & Tools
+- `npm run dev`
+- `npm run build`
+- `npm run test:e2e`
+- `npm run deploy` — existing S3 / CloudFront helper (legacy infra)
 
-- **Routing:** React Router
-- **Forms:** React Hook Form, Zod
-- **Animation:** Framer Motion
-- **Charts:** Recharts
-- **UI Components:** Shadcn/UI
+Terraform and the Lambda/Mangum wrapper are still in the repo. They are not the local development path.
 
-### Architecture Overview
+## License
 
-The backend follows a clean, layered architecture:
-
-- **Routers** (`/app/routers`): Defines API endpoints, handles request validation
-- **Services** (`/app/services`): Core business logic and orchestration
-- **CRUD** (`/app/crud`): Database abstraction layer for all data operations
-- **Models & Schemas** (`/app/models.py`, `/app/schemas.py`): Database schemas (Pynamodb) and API contracts (Pydantic)
-- **AI Engine** (`/app/ai`): Dedicated module for AI tasks, prompt engineering, and content generation
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-**For Both:**
-
-- [Git](https://git-scm.com/)
-- [AWS CLI](https://aws.amazon.com/cli/) configured with your credentials (for deployment)
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) (for deployment)
-
-**For Backend:**
-
-- Python 3.11+
-- [Docker](https://www.docker.com/)
-- `uv` (recommended for Python package management)
-
-**For Frontend:**
-
-- [Node.js](https://nodejs.org/en) (v18 or later)
-- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
-
-### Backend Setup
-
-1. **Clone the backend repository:**
-
-   ```bash
-   git clone https://github.com/ikram98ai/khaneducation.git
-   cd khaneducation
-   ```
-
-2. **Set up environment variables:**
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   Fill in required values (database credentials, API keys, etc.)
-
-3. **Install dependencies:**
-
-   ```bash
-   uv pip install -r requirements.txt
-   ```
-
-4. **Run the application:**
-
-   ```bash
-   uvicorn app.main:app --reload
-   ```
-
-   API documentation available at `http://127.0.0.1:8000/docs`
-
-5. **Seed the database (optional):**
-   ```bash
-   python seed_db.py
-   ```
-
-### Frontend Setup
-
-1. **Clone the frontend repository:**
-
-   ```bash
-   cd web
-   ```
-
-2. **Install dependencies:**
-
-   ```bash
-   npm install
-   ```
-
-
-3. **Run the development server:**
-   ```bash
-   npm run dev
-   ```
-   Access at `http://localhost:5173`
-
----
-
-## 📜 Available Scripts
-
-### Backend
-
-- `uvicorn app.main:app --reload`: Runs the development server
-- `python seed_db.py`: Populates database with initial test data
-
-### Frontend
-
-- `npm run dev`: Starts Vite development server
-- `npm run build`: Builds for production
-- `npm run lint`: Runs ESLint
-- `npm run type-check`: TypeScript static type check
-- `npm run deploy`: Full deployment pipeline (build, upload to S3, invalidate CloudFront)
-
----
-
-## 📚 API Documentation
-
-Interactive Swagger UI documentation is automatically generated and available at:
-`http://127.0.0.1:8000/docs`
-
----
-
-## ✨ Live Demo
-
-**[Visit Khan Education](https://khaneducation.ai)**
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! If you have suggestions for improvements or want to fix a bug, please feel free to open an issue or submit a pull request.
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License. See the `LICENSE` file for more details.
+MIT. See `LICENSE`.

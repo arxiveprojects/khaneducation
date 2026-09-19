@@ -2,178 +2,159 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Educational Platform Design System - Coursera-inspired */
+/* Editorial atelier — warm press paper, terracotta ink, moss accents */
 
 @layer base {
   :root {
-    /* Primary Brand Colors - Coursera Blue */
-    --background: 0 0% 100%;
-    --foreground: 216 19% 16%;
+    --background: 38 36% 94%;
+    --foreground: 22 24% 12%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 216 19% 16%;
+    --card: 36 42% 97%;
+    --card-foreground: 22 24% 12%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 216 19% 16%;
+    --popover: 36 42% 97%;
+    --popover-foreground: 22 24% 12%;
 
-    --primary: 215 100% 41%;
-    --primary-foreground: 0 0% 100%;
-    --primary-hover: 215 100% 36%;
+    --primary: 16 68% 40%;
+    --primary-foreground: 36 50% 97%;
+    --primary-hover: 16 70% 34%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 216 19% 16%;
+    --secondary: 36 22% 88%;
+    --secondary-foreground: 22 24% 16%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 36 20% 90%;
+    --muted-foreground: 24 12% 38%;
 
-    --accent: 186 100% 94%;
-    --accent-foreground: 186 100% 26%;
+    --accent: 148 22% 88%;
+    --accent-foreground: 152 28% 18%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 4 72% 42%;
+    --destructive-foreground: 36 50% 97%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 215 100% 41%;
+    --border: 32 18% 80%;
+    --input: 32 18% 80%;
+    --ring: 16 68% 40%;
 
-    /* Educational Platform Specific Colors */
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 45 93% 47%;
-    --warning-foreground: 0 0% 100%;
-    --info: 199 89% 48%;
-    --info-foreground: 0 0% 100%;
+    --success: 148 32% 32%;
+    --success-foreground: 36 50% 97%;
+    --warning: 34 72% 42%;
+    --warning-foreground: 36 50% 97%;
+    --info: 198 28% 34%;
+    --info-foreground: 36 50% 97%;
 
-    /* Learning Progress Colors */
-    --progress-bg: 220 14% 96%;
-    --progress-fill: 215 100% 41%;
-    --progress-complete: 142 71% 45%;
+    --progress-bg: 36 20% 88%;
+    --progress-fill: 16 68% 40%;
+    --progress-complete: 148 32% 32%;
 
-    /* Interactive States */
-    --hover-overlay: 215 100% 41% / 0.1;
-    --active-overlay: 215 100% 41% / 0.2;
+    --moss: 152 24% 26%;
+    --ink: 22 24% 12%;
+    --gold: 38 48% 44%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(215 100% 41%), hsl(215 85% 50%));
-    --gradient-secondary: linear-gradient(135deg, hsl(220 14% 96%), hsl(210 40% 96%));
-    --gradient-hero: linear-gradient(135deg, hsl(215 100% 41%) 0%, hsl(215 85% 50%) 100%);
+    --gradient-primary: linear-gradient(160deg, hsl(16 68% 40%), hsl(22 48% 28%));
+    --gradient-secondary: linear-gradient(180deg, hsl(38 36% 96%), hsl(36 28% 90%));
+    --gradient-hero: linear-gradient(165deg, hsl(28 32% 88%) 0%, hsl(38 36% 94%) 45%, hsl(148 16% 86%) 100%);
 
-    /* Apple-inspired Depth & Layering System */
-    --shadow-soft: 0 1px 3px 0 hsl(0 0% 0% / 0.08), 0 1px 2px -1px hsl(0 0% 0% / 0.06);
-    --shadow-medium: 0 4px 12px -2px hsl(0 0% 0% / 0.12), 0 2px 8px -2px hsl(0 0% 0% / 0.08);
-    --shadow-large: 0 12px 24px -4px hsl(0 0% 0% / 0.15), 0 8px 16px -4px hsl(0 0% 0% / 0.1);
-    --shadow-glow: 0 0 40px hsl(215 100% 41% / 0.3);
-    --shadow-elevated: 0 20px 40px -12px hsl(0 0% 0% / 0.2), 0 8px 32px -8px hsl(0 0% 0% / 0.12);
-    --shadow-floating: 0 32px 64px -12px hsl(0 0% 0% / 0.25), 0 16px 48px -16px hsl(0 0% 0% / 0.15);
-    --shadow-inset: inset 0 1px 0 hsl(0 0% 100% / 0.1), inset 0 -1px 0 hsl(0 0% 0% / 0.1);
-    
-    /* Glass & Blur Effects */
-    --glass-bg: hsl(var(--background) / 0.8);
-    --glass-border: hsl(var(--border) / 0.2);
-    --blur-backdrop: blur(20px) saturate(180%);
+    --shadow-soft: 0 1px 0 hsl(22 24% 12% / 0.04), 0 8px 24px -16px hsl(22 30% 18% / 0.28);
+    --shadow-medium: 0 1px 0 hsl(36 50% 100% / 0.6) inset, 0 18px 40px -24px hsl(22 30% 18% / 0.35);
+    --shadow-large: 0 28px 56px -28px hsl(22 30% 12% / 0.4);
+    --shadow-glow: 0 0 0 1px hsl(16 68% 40% / 0.18);
+    --shadow-elevated: 0 24px 48px -28px hsl(22 30% 12% / 0.38);
+    --shadow-floating: 0 36px 70px -32px hsl(22 30% 12% / 0.42);
+    --shadow-inset: inset 0 1px 0 hsl(36 50% 100% / 0.55);
+
+    --glass-bg: hsl(36 42% 97% / 0.78);
+    --glass-border: hsl(32 18% 80% / 0.7);
+    --blur-backdrop: blur(18px) saturate(140%);
     --blur-subtle: blur(8px);
-    --blur-medium: blur(16px);
-    
-    /* Interactive Surface States */
-    --surface-base: hsl(var(--card));
-    --surface-elevated: hsl(var(--card));
-    --surface-hover: hsl(var(--accent) / 0.05);
-    --surface-pressed: hsl(var(--accent) / 0.1);
-    --surface-glass: hsl(var(--background) / 0.7);
+    --blur-medium: blur(14px);
 
-    /* Animations */
+    --surface-base: hsl(var(--card));
+    --surface-elevated: hsl(36 48% 98%);
+    --surface-hover: hsl(16 40% 40% / 0.05);
+    --surface-pressed: hsl(16 40% 40% / 0.08);
+    --surface-glass: hsl(38 36% 94% / 0.72);
+
     --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-normal: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 
-    --radius: 0.5rem;
+    --radius: 0.85rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 36 30% 93%;
+    --sidebar-foreground: 22 24% 16%;
+    --sidebar-primary: 16 68% 40%;
+    --sidebar-primary-foreground: 36 50% 97%;
+    --sidebar-accent: 36 22% 88%;
+    --sidebar-accent-foreground: 22 24% 16%;
+    --sidebar-border: 32 18% 80%;
+    --sidebar-ring: 16 68% 40%;
   }
 
   .dark {
-    /* Dark mode adaptations for educational platform */
-    --background: 216 19% 11%;
-    --foreground: 0 0% 95%;
+    --background: 22 22% 10%;
+    --foreground: 36 32% 93%;
 
-    --card: 216 19% 13%;
-    --card-foreground: 0 0% 95%;
+    --card: 24 18% 14%;
+    --card-foreground: 36 32% 93%;
 
-    --popover: 216 19% 13%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 22 16% 11%;
+    --popover-foreground: 36 28% 92%;
 
-    --primary: 215 100% 55%;
-    --primary-foreground: 216 19% 11%;
-    --primary-hover: 215 100% 50%;
+    --primary: 16 62% 58%;
+    --primary-foreground: 22 24% 10%;
+    --primary-hover: 16 62% 64%;
 
-    --secondary: 216 19% 16%;
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 22 12% 16%;
+    --secondary-foreground: 36 28% 92%;
 
-    --muted: 216 19% 16%;
-    --muted-foreground: 215 16% 65%;
+    --muted: 22 12% 16%;
+    --muted-foreground: 32 12% 68%;
 
-    --accent: 186 100% 15%;
-    --accent-foreground: 186 100% 85%;
+    --accent: 152 16% 16%;
+    --accent-foreground: 148 28% 82%;
 
-    --destructive: 0 84% 65%;
-    --destructive-foreground: 0 0% 95%;
+    --destructive: 4 62% 52%;
+    --destructive-foreground: 36 28% 94%;
 
-    --border: 216 19% 18%;
-    --input: 216 19% 18%;
-    --ring: 215 100% 55%;
+    --border: 22 12% 20%;
+    --input: 22 12% 20%;
+    --ring: 16 62% 58%;
 
-    /* Educational Platform Dark Mode Colors */
-    --success: 142 71% 55%;
-    --success-foreground: 0 0% 95%;
-    --warning: 45 93% 57%;
-    --warning-foreground: 216 19% 11%;
-    --info: 199 89% 58%;
-    --info-foreground: 0 0% 95%;
+    --success: 148 28% 48%;
+    --success-foreground: 22 18% 8%;
+    --warning: 34 68% 54%;
+    --warning-foreground: 22 18% 8%;
+    --info: 198 32% 58%;
+    --info-foreground: 22 18% 8%;
 
-    /* Dark mode gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(215 100% 55%), hsl(215 85% 60%));
-    --gradient-secondary: linear-gradient(135deg, hsl(216 19% 16%), hsl(216 19% 20%));
-    --gradient-hero: linear-gradient(135deg, hsl(215 100% 55%) 0%, hsl(215 85% 60%) 100%);
+    --gradient-primary: linear-gradient(160deg, hsl(16 62% 52%), hsl(22 30% 22%));
+    --gradient-secondary: linear-gradient(180deg, hsl(22 16% 12%), hsl(22 14% 9%));
+    --gradient-hero: linear-gradient(165deg, hsl(22 18% 10%) 0%, hsl(22 16% 8%) 50%, hsl(152 12% 10%) 100%);
 
-    /* Dark mode Apple-inspired shadows */
-    --shadow-soft: 0 1px 3px 0 hsl(0 0% 0% / 0.4), 0 1px 2px -1px hsl(0 0% 0% / 0.3);
-    --shadow-medium: 0 4px 12px -2px hsl(0 0% 0% / 0.5), 0 2px 8px -2px hsl(0 0% 0% / 0.4);
-    --shadow-large: 0 12px 24px -4px hsl(0 0% 0% / 0.6), 0 8px 16px -4px hsl(0 0% 0% / 0.5);
-    --shadow-glow: 0 0 40px hsl(215 100% 55% / 0.4);
-    --shadow-elevated: 0 20px 40px -12px hsl(0 0% 0% / 0.7), 0 8px 32px -8px hsl(0 0% 0% / 0.5);
-    --shadow-floating: 0 32px 64px -12px hsl(0 0% 0% / 0.8), 0 16px 48px -16px hsl(0 0% 0% / 0.6);
-    --shadow-inset: inset 0 1px 0 hsl(0 0% 100% / 0.05), inset 0 -1px 0 hsl(0 0% 0% / 0.2);
-    
-    /* Dark mode glass & surfaces */
-    --glass-bg: hsl(var(--background) / 0.8);
-    --glass-border: hsl(var(--border) / 0.3);
+    --shadow-soft: 0 8px 24px -16px hsl(0 0% 0% / 0.55);
+    --shadow-medium: 0 18px 40px -20px hsl(0 0% 0% / 0.6);
+    --shadow-large: 0 28px 56px -24px hsl(0 0% 0% / 0.7);
+    --shadow-glow: 0 0 0 1px hsl(16 62% 58% / 0.28);
+    --shadow-elevated: 0 24px 48px -20px hsl(0 0% 0% / 0.7);
+    --shadow-floating: 0 36px 70px -24px hsl(0 0% 0% / 0.75);
+    --shadow-inset: inset 0 1px 0 hsl(36 28% 100% / 0.04);
+
+    --glass-bg: hsl(22 16% 11% / 0.78);
+    --glass-border: hsl(22 12% 24% / 0.7);
     --surface-base: hsl(var(--card));
-    --surface-elevated: hsl(var(--card));
-    --surface-hover: hsl(var(--accent) / 0.1);
-    --surface-pressed: hsl(var(--accent) / 0.2);
-    --surface-glass: hsl(var(--background) / 0.7);
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --surface-elevated: hsl(22 16% 13%);
+    --surface-hover: hsl(16 40% 50% / 0.08);
+    --surface-pressed: hsl(16 40% 50% / 0.14);
+    --surface-glass: hsl(22 18% 8% / 0.72);
+
+    --sidebar-background: 22 16% 9%;
+    --sidebar-foreground: 36 28% 92%;
+    --sidebar-primary: 16 62% 58%;
+    --sidebar-primary-foreground: 22 18% 8%;
+    --sidebar-accent: 22 12% 16%;
+    --sidebar-accent-foreground: 36 28% 92%;
+    --sidebar-border: 22 12% 20%;
+    --sidebar-ring: 16 62% 58%;
   }
 }
 
@@ -182,39 +163,71 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "ss01", "kern";
+    background-image:
+      radial-gradient(1200px 600px at 8% -10%, hsl(16 50% 62% / 0.09), transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, hsl(148 28% 40% / 0.08), transparent 50%),
+      linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
+  }
+
+  body::before {
+    content: "";
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    opacity: 0.09;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: Fraunces, Georgia, serif;
+    font-optical-sizing: auto;
+    letter-spacing: -0.03em;
   }
 }
 
+@layer components {
+  .page-shell {
+    @apply relative mx-auto w-full max-w-6xl px-5 py-8 md:px-8 md:py-10;
+  }
+
+  .hairline {
+    background: linear-gradient(90deg, transparent, hsl(var(--border)), transparent);
+    height: 1px;
+  }
+
+  .rule {
+    @apply border-b border-border/80;
+  }
+}
 
 .border-l-3 {
   border-left-width: 3px;
 }
 
-/* Custom scrollbar */
- div::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+div::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
 div::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 3px;
+  background: transparent;
 }
 
 div::-webkit-scrollbar-thumb {
-  background: hsl(214, 10%, 47%);
-  border-radius: 3px;
+  background: hsl(22 14% 48% / 0.35);
+  border-radius: 999px;
 }
 
-div::-webkit-scrollbar-thumb:hover {
-  background: hsl(220, 7%, 27%);
-}
-
-/* Ensure text wrapping */
 * {
   word-wrap: break-word;
   overflow-wrap: break-word;
-  hyphens: auto;
 }

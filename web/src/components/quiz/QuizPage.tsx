@@ -20,7 +20,8 @@ import {
 import { Quiz } from "./Quiz";
 
 export const QuizPage = () => {
-  const { lessonId } = useParams();
+  const { lessonId, chapterId } = useParams();
+  const quizId = chapterId || lessonId;
 
   const [quizStarted, setQuizStarted] = useState(false);
 
@@ -52,7 +53,7 @@ export const QuizPage = () => {
   if (quizStarted)
     return (
       <Quiz
-        lessonId={lessonId}
+        lessonId={quizId || ""}
         quizStarted={quizStarted}
         setQuizStarted={setQuizStarted}
         startTime={startTime}

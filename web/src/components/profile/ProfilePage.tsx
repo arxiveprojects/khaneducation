@@ -80,7 +80,7 @@ export const ProfilePage = () => {
                 </div>
                 <div>
                   <Label>Role</Label>
-                  <p className="text-lg">{profile.user.role}</p>
+                  <p className="text-lg">{profile.user.account_type}</p>
                 </div>
                 {profile.student_profile && (
                   <>

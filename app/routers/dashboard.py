@@ -1,42 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from .. import schemas, services, models
-from ..dependencies import get_current_student
-import logging
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from .. import schemas, services
+from ..database import get_db
+from ..dependencies import get_current_user, require_school_staff
+from ..models import School, SchoolMembership, User
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
-@router.get("/student/", response_model=schemas.StudentDashboard)
-async def student_dashboard(
-    current_student: models.Student = Depends(get_current_student),
+@router.get("/student", response_model=schemas.StudentDashboard)
+def student_dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return services.student_dashboard(db, user)
+
+
+@router.get("/school/{school_id}", response_model=schemas.SchoolDashboard)
+def school_dashboard(
+    school_id: str,
+    membership: SchoolMembership = Depends(require_school_staff),
+    db: Session = Depends(get_db),
 ):
-    try:
-        dashboard_data = await services.get_student_dashboard_data(current_student)
-        return dashboard_data
-    except Exception as e:
-        logger.error(f"Error fetching student dashboard for student {current_student.user_id}: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error")
-
-
-@router.get("/admin/", response_model=schemas.AdminDashboard)
-def admin_dashboard():
-    try:
-        # These will still use scan, as there's no specific index for "latest"
-        # For a production system, you might implement a more sophisticated approach
-        # like a dedicated "latest items" table or a more complex indexing strategy.
-        recent_lessons = list(models.Lesson.scan(limit=5))
-
-        return {
-            "total_students": models.Student.count(),
-            "total_lessons": models.Lesson.count(),
-            "total_subjects": models.Subject.count(),
-            "total_quizzes": models.Quiz.count(),
-            "recent_lessons": recent_lessons,
-        }
-    except Exception as e:
-        logger.error(f"Error fetching admin dashboard: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error")
+    school = db.get(School, school_id)
+    if not school:
+        raise HTTPException(status_code=404, detail="School not found")
+    return services.school_dashboard(db, school)

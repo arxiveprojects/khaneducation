@@ -6,7 +6,7 @@ import { ThemeProvider } from './providers/ThemeProvider'
 
 createRoot(document.getElementById("root")!).render(
   <QueryProvider>
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <App />
     </ThemeProvider>
   </QueryProvider>

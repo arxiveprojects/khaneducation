@@ -9,13 +9,13 @@ const Card = React.forwardRef<
   }
 >(({ className, variant = 'default', ...props }, ref) => {
   const variants = {
-    default: "rounded-lg border bg-surface-base text-card-foreground shadow-soft hover:shadow-medium transition-all duration-300",
-    elevated: "rounded-lg border bg-surface-elevated text-card-foreground shadow-elevated hover:shadow-floating transition-all duration-300 hover:scale-[1.01]",
-    glass: "rounded-lg border border-glass bg-glass text-card-foreground shadow-medium backdrop-blur-glass hover:shadow-elevated transition-all duration-300",
-    floating: "rounded-lg border border-glass/50 bg-surface-glass text-card-foreground shadow-floating backdrop-blur-glass animate-float hover:shadow-floating hover:scale-[1.02] transition-all duration-300",
-    interactive: "rounded-lg border bg-surface-base text-card-foreground shadow-soft hover:shadow-elevated hover:scale-[1.02] hover:bg-surface-hover cursor-pointer transition-all duration-300 active:scale-[0.98]"
+    default: "rounded-2xl border border-border/80 bg-card text-card-foreground shadow-soft",
+    elevated: "rounded-2xl border border-border/80 bg-card text-card-foreground shadow-medium",
+    glass: "rounded-2xl border border-border/60 bg-card/70 text-card-foreground shadow-soft backdrop-blur-md",
+    floating: "rounded-2xl border border-border/80 bg-card text-card-foreground shadow-medium",
+    interactive: "rounded-2xl border border-border/80 bg-card text-card-foreground shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-medium"
   }
-  
+
   return (
     <div
       ref={ref}
@@ -45,7 +45,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      "text-2xl font-semibold leading-none tracking-tight",
+      "font-display text-2xl font-semibold leading-none tracking-tight",
       className
     )}
     {...props}
